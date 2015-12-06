@@ -35,7 +35,12 @@ else
 if [ ! -d lms-lmq-beta ]
 then
 rm -r lms-lmq-beta-master
+if command -v curl 
+then
 curl -LOk https://github.com/benumc/lms-lmq-beta/archive/master.zip
+else
+wget https://github.com/benumc/lms-lmq-beta/archive/master.zip
+fi
 unzip master.zip
 rm master.zip
 fi
