@@ -1,0 +1,503 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="racepoint_component_profile.xsd"
+    manufacturer="lmslmq"
+    model="heos-player"
+    device_class="Media_server"
+    unique_identifier="hostname"
+    minimum_component_engine_version="0.0"
+    rpm_xml_version="2.5.2">
+    <notes>
+        Make sure to use the full player name in the Hostname field
+    </notes>
+    <component_properties>
+        <media_metadata_available type="squeeze"/>
+        <coprocessor_required type="SqueezeboxQuery"/>
+    </component_properties>
+    <control_interfaces preferred="ip" control_optional="true">
+        <ip port="9000" response_time_length_ms="500" protocol="http">
+            <send_postfix type="hex">0A</send_postfix>
+            <receive_end_condition test_condition="data" type="character">}</receive_end_condition>
+            <receive_end_condition test_condition="data" type="character">,</receive_end_condition>
+            <receive_end_condition test_condition="data" type="character">200</receive_end_condition>
+            <!--<send_postfix type="hex">0A</send_postfix>
+                <receive_end_condition test_condition="data" type="hex">0A</receive_end_condition>-->
+        </ip>
+    </control_interfaces>
+    <media_interfaces>
+        <output name_on_component="Output">
+            <combined_media>
+                <audio_media type="hdmi_audio"/>
+                <video_media type="hdmi"/>
+            </combined_media>
+            <audio_media type="analog_minijack"/>
+            <audio_media type="rca_stereo"/>
+            <audio_media type="coaxial_digital"/>
+            <audio_media type="optical_digital"/>
+            <resource resource_type="AV_VOLUMECONTROL_FUNCTION"/>
+            <resource resource_type="AV_LIVEMEDIAQUERY_IPOD_SOURCE"></resource>
+        </output>
+        <output name_on_component="Heos LMQ">
+            <audio_media type="link_audio"/>
+            <resource resource_type="AV_LIVEMEDIAQUERY_IPOD_SOURCE"></resource>
+        </output>
+        <data name_on_component="Ethernet">
+            <combined_media>
+                <data_media type="ethernet"/>
+                <control port="1255"/>
+            </combined_media>
+        </data>
+        <internal name_on_component="Speakers">
+            <audio_media></audio_media>
+            <resource resource_type="AV_STEREOSPEAKERS_SINK"/>
+            <resource resource_type="AV_AMPLIFIER_FUNCTION"/>
+            <resource resource_type="AV_VOLUMECONTROL_FUNCTION"/>
+            <resource resource_type="AV_LIVEMEDIAQUERY_IPOD_SOURCE"></resource>
+        </internal>
+    </media_interfaces>
+    <state_variable_list>
+        <state_variable name="Power_current_power_setting" owning_logical_component="Media_server" state_center_binding="CurrentPowerStatus" state_center_type="string">OFF</state_variable>
+        <state_variable name="Mute_current_mute_setting" state_center_binding="CurrentMuteStatus" state_center_type="percent_escaped_string" owning_logical_component="Media_server">OFF</state_variable>
+        <volume_state_variable name="Volume_current_volume" min_value="0" max_value="100" owning_logical_component="Media_server" granularity="1.00000" state_center_binding="CurrentVolume" state_center_type="percent_escaped_string">0</volume_state_variable>
+        <state_variable name="PlayerInfoSent" state_center_binding="PlayerInfoSent" owning_logical_component="Media_server">0</state_variable>
+        <state_variable name="LoadPlugin" state_center_binding="LoadPlugin" state_center_type="string" receive_updates_from_state_center="no" user_editable="no" owning_logical_component="Media_server">Heos</state_variable>
+        <state_variable name="HeosIpAddress" state_center_binding="HeosIpAddress" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
+        <state_variable name="HeosUser" state_center_binding="HeosUser" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">user@email.com</state_variable>
+        <state_variable name="HeosPassword" state_center_binding="HeosPassword" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">password</state_variable>
+        <state_variable name="TopMenu1" state_center_binding="TopMenu1" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">groups</state_variable>
+        <state_variable name="TopMenu2" state_center_binding="TopMenu2" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">queue</state_variable>
+        <state_variable name="TopMenu3" state_center_binding="TopMenu3" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">rdio</state_variable>
+        <state_variable name="TopMenu4" state_center_binding="TopMenu4" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">deezer</state_variable>
+        <state_variable name="TopMenu5" state_center_binding="TopMenu5" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">tunein</state_variable>
+        <state_variable name="TopMenu6" state_center_binding="TopMenu6" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">soundcloud</state_variable>
+        <state_variable name="TopMenu7" state_center_binding="TopMenu7" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">favorites</state_variable>
+        <state_variable name="TopMenu8" state_center_binding="TopMenu8" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">playlists</state_variable>
+        <state_variable name="TopMenu9" state_center_binding="TopMenu9" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">history</state_variable>
+        <state_variable name="TopMenu10" state_center_binding="TopMenu10" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
+        <state_variable name="TopMenu11" state_center_binding="TopMenu11" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
+        <state_variable name="TopMenu12" state_center_binding="TopMenu12" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
+        <state_variable name="TopMenu13" state_center_binding="TopMenu13" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
+        <state_variable name="TopMenu14" state_center_binding="TopMenu14" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
+        <state_variable name="TopMenu15" state_center_binding="TopMenu15" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
+        <state_variable name="TopMenu16" state_center_binding="TopMenu16" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
+        <state_variable name="TopMenu17" state_center_binding="TopMenu17" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
+        <state_variable name="TopMenu18" state_center_binding="TopMenu18" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
+        <state_variable name="TopMenu19" state_center_binding="TopMenu19" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
+    </state_variable_list>
+    <logical_component logical_component_name="Media_server">
+        <implementation>
+            <output name_on_component="Output"></output>
+            <output name_on_component="Heos LMQ"></output>
+            <internal name_on_component="Speakers"></internal>
+        </implementation>
+        <status_messages>
+            <status_message name="Squeezebox Status">
+                <data type="character">
+                    <update state="PlayType" type="integer"></update>
+                    <update state="LikeSong" type="integer"></update>
+                    <update state="CurrentShuffleStatus" type="integer"></update>
+                    <update state="CurrentRepeatStatus" type="integer"></update>
+                    <update state="CurrentPauseStatus" type="integer"></update>
+                    <update state="CurrentCombinedPlayStatus" type="string"></update>
+                    <update state="CurrentArtworkURL" type="string"></update>
+                    <update state="CurrentProgress" type="integer"></update>
+                    <update state="CurrentElapsedTime" type="string"></update>
+                    <update state="CurrentRemainingTime" type="string"></update>
+                    <update state="CurrentElapsedHour" type="integer"></update>
+                    <update state="CurrentElapsedMinute" type="integer"></update>
+                    <update state="CurrentElapsedSecond" type="integer"></update>
+                    <update state="CurrentTimeRemainingHour" type="integer"></update>
+                    <update state="CurrentTimeRemainingMinute" type="integer"></update>
+                    <update state="CurrentTimeRemainingSecond" type="integer"></update>
+                </data>
+            </status_message>
+        </status_messages>
+        <universal_component_actions>
+            <action name="PowerOn">
+                <execute_on_state_variable_condition name="Power_current_power_setting" test_condition="not_equal">1</execute_on_state_variable_condition>
+                <update_state_variable name="Power_current_power_setting" update_type="set" update_source="constant">ON</update_state_variable>
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["power","1"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="2000"/>
+                    </command>
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["listen","1"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
+            <action name="PowerOff">
+                <update_state_variable name="Power_current_power_setting" update_type="set" update_source="constant">OFF</update_state_variable>
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["power","0"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="2000"/>
+                    </command>
+                </command_interface>
+            </action>
+        </universal_component_actions>
+        <resource_component_actions resource_type="AV_VOLUMECONTROL_FUNCTION" control_restriction="ir,ip">
+            <action name="SetVolume">
+                <action_argument name="VolumeValue" note="Enter the Desired Volume(0 - 50)"/>
+                <update_volume_variables name="Volume_current_volume" update_type="set" update_source="action_argument">VolumeValue</update_volume_variables>
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["mixer","volume","</parameter>
+                            <volume_parameter isHttpBody="true" volume_state_variable="Volume_current_volume" state_variable="Volume_current_volume" parameter_data_type="character" parameter_total_width="3" parameter_justify="left"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
+            <action name="DecreaseVolume">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["mixer","volume","-1"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
+            <action name="IncreaseVolume">
+                <command_interface interface="ip">
+                    <command>
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["mixer","volume","+1"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
+            <action name="MuteOn">
+                <update_state_variable name="Mute_current_mute_setting" update_type="set" update_source="constant">ON</update_state_variable>
+                <command_interface interface="ip">
+                    <command>
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["mixer","muting","1"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
+            <action name="MuteOff">
+                <update_state_variable name="Mute_current_mute_setting" update_type="set" update_source="constant">OFF</update_state_variable>
+                <command_interface interface="ip">
+                    <command>
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["mixer","muting","0"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
+        </resource_component_actions>
+        <resource_component_actions resource_type="AV_LIVEMEDIAQUERY_IPOD_SOURCE" control_restriction="ip">
+            <action name="CommandRateLikeSong">
+                <command_interface interface="ip">
+                    <command></command>
+                </command_interface>
+            </action>
+            <action name="CommandRateDislikeSong">
+                <command_interface interface="ip">
+                    <command></command>
+                </command_interface>
+            </action>
+            <action name="CommandSendRequest">
+                <action_argument name="URL"/>
+                <command_interface interface="ip">
+                    <command></command>
+                </command_interface>
+            </action>
+            <action name="CommandSkipUp">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["button","jump_fwd"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
+            <action name="CommandSkipDown">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["button","jump_rew"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
+            <action name="CommandPlay">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["play"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
+            <action name="CommandPause">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["pause"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
+            <action name="SkipToTime">
+                <action_argument name="ProgessValue"/>
+                <command_interface interface="ip">
+                    <command></command>
+                </command_interface>
+            </action>
+            <action name="CommandSkipPluginTrack">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                    </command>
+                </command_interface>
+            </action>	
+            <action name="CommandStop">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["stop"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+                
+            </action>
+            <action name="ShuffleOn">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["button","shuffle_toggle"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+                
+            </action>
+            <action name="ShuffleOff">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["button","shuffle_toggle"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+                
+            </action>
+            <action name="RepeatOn">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["button","repeat_toggle"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+                
+            </action>
+            <action name="RepeatOff">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["button","repeat_toggle"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
+            <action name="CommandPowerOff">
+                <command_interface interface="ip">
+                    <command></command>
+                </command_interface>
+            </action>
+            <action name="PowerOn">
+                <action_argument name="URL"/>
+                <command_interface interface="ip">
+                    <command></command>
+                </command_interface>
+            </action>
+        </resource_component_actions>
+        <custom_component_actions>
+            <action name="SendPlayerInfo">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["name:</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">,cmd:playerinfo,plugin:</parameter>
+                            <parameter parameter_data_type="character" state_variable="LoadPlugin" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">,un:</parameter>
+                            <parameter parameter_data_type="character" state_variable="HeosUser" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">,pw:</parameter>
+                            <parameter parameter_data_type="character" state_variable="HeosPassword" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">,topmenu:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu1" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu2" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu3" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu4" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu5" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu6" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu7" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu8" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu9" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu10" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu11" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu12" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu13" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu14" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu15" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu16" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu17" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu18" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
+                            <parameter parameter_data_type="character" state_variable="TopMenu19" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">"]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+                <execute_on_schedule period_ms="2000"/>
+            </action>
+            <action name="Favorites">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["button","favorites"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
+            <action name="ToggleDisplayTextSize">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["button","textsize_toggle"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
+            <action name="Search">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["button","search"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
+            <action name="ToggleDisplayBrightness">
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["button","brightness_toggle"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
+        </custom_component_actions>
+    </logical_component>
+</component>
