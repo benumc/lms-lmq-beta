@@ -42,5 +42,3 @@ fi
 nohup ruby lms-lmq-beta-master/LMSLMQ.rb >/dev/null 2>&1 &
 fi
 ```
-
-12. Upload
