@@ -45,7 +45,7 @@ def LoadPlugin(pNm)
 end
 
 def GetPlugins()
-  Dir["#{File.dirname(__FILE__)}/plugins/**/*.rb"].each { |f| require(f) }
+  Dir["#{ File.expand_path(File.dirname(__FILE__))}/plugins/**/*.rb"].each { |f| require(f) }
 end
 
 def ReadFromSavant(local)
