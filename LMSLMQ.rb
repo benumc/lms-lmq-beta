@@ -6,7 +6,7 @@ require 'socket'
 require 'net/http'
 require 'uri'
 require "open-uri"
-require 'open_uri_redirections'
+#require 'open_uri_redirections'
 require 'json'
 require 'tempfile'
 require 'base64'
@@ -590,7 +590,8 @@ def ConnThread(local)
             #url = res["Location"] if res["Location"]
             
             file = Tempfile.new('lmq')
-            file.write open(url,:allow_redirections => :all).read
+            #file.write open(url,:allow_redirections => :all).read
+            file.write open(url).read
             #puts file.path
             file.close
             `convert #{file.path} -background none -resize #{size} -gravity center -extent #{size} #{file.path}`
