@@ -400,10 +400,12 @@ end
 def SavantRequest(req)
   hstnm = req["params"][0]
   hostname = {}
-  if $uidHash[hstnm]
-    hostname = $uidHash[hstnm]
-    pNm = (hostname["plugin"]||"").capitalize
-  else
+  #if $uidHash[hstnm]
+  #  hostname = $uidHash[hstnm]
+  #  pNm = (hostname["plugin"]||"").capitalize
+  #else
+  #puts req
+  if hstnm.include?("cmd:playerinfo")
     hstnm.scan(/([^:]+):([^,]+),?/).map {|x| hostname[x[0]]=x[1]}
     pNm = (hostname["plugin"]||"").capitalize
     unless pNm.to_s == ""
@@ -412,10 +414,15 @@ def SavantRequest(req)
     else
       return EmptyBody()
     end
+  elsif $uidHash[hstnm]
+    hostname = $uidHash[hstnm]
+    pNm = (hostname["plugin"]||"").capitalize
+  else
+    return EmptyBody()
   end
+  #end
   #puts "Hostname: #{hostname}"
   #LoadPlugin(pNm)
-  #puts req
   req = req["params"][1]
   case 
   when req == ["version","?"] #fixed response not sure how much is needed

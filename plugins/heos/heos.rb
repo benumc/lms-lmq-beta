@@ -89,6 +89,8 @@ def SendToPlayer(msg)
       @@recBuffer.delete_at(i)
       return r
       break
+    elsif 
+      puts 
     end
     #c = ""
     #m = ""
@@ -108,7 +110,9 @@ end
 def Login(un,pw)
   loop do
     r = SendToPlayer("system/sign_in?un=#{un}&pw=#{pw}")
-    break if r["heos"]["result"]=="success"
+    puts "Login Status: #{r}"
+    return true if r["heos"]["result"]=="success"
+    return false if r["heos"]["result"]=="fail"
     sleep(1)
   end
   #r = SendToPlayer("system/check_account")
@@ -116,7 +120,7 @@ def Login(un,pw)
   #  sleep(1)
   #  r = SendToPlayer("system/check_account")
   #end
-  return true
+  #return true
 end
 
 def GetPlayerId(devName)
@@ -211,7 +215,6 @@ def SavantRequest(hostname,cmd,req)
       :Sources => {},
       :TopMenu => t
     }
-    
     sh = {}
     sn = 1
     if hostname["sources"]
@@ -234,6 +237,10 @@ def SavantRequest(hostname,cmd,req)
     
     SendToPlayer("system/register_for_change_events?enable=on")
   end
+  
+  return nil unless @@playerDB[hostname["name"]][:SignedIn]
+  
+  #puts "Sending Command: #{cmd}"
   return send(cmd,hostname["name"],h["id"],h)
 rescue
   return nil
@@ -381,7 +388,7 @@ def ContextMenu(pNm,mId,params)
   #puts "Context"
 puts "#{__method__} Debug: MID - #{mId} : Params - #{params}"
   case params["cmd"]
-  when "container"
+  when "container", "album", artist
     b = [{:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=1",:cmd=>"cmd:queue",:text=>"Play Now"},
          {:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=2",:cmd=>"cmd:queue",:text=>"Play Next"},
          {:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=3",:cmd=>"cmd:queue",:text=>"Add To Queue"},
@@ -404,7 +411,7 @@ def NowPlaying(pNm,mId,params)
   
   b = []
   r = SendToPlayer("player/get_queue?pid=#{@@playerDB[pNm][:HeosId]}")
-  puts r
+  #puts r
   if r
     h = {}
     h[:id] = "save"
@@ -683,6 +690,11 @@ def station(pNm,mId,params)
   return {}
 end
 
+def station_favorite(pNm,mId,params)
+  SendToPlayer("browse/set_service_option?option=19&pid=#{@@playerDB[pNm][:HeosId]}")
+  return {}
+end
+
 def song(pNm,mId,params)
 puts "#{__method__} Partially Implemented: #{msg}"
 puts params
@@ -696,48 +708,68 @@ def queue(pNm,mId,params)
   return {}
 end
 
+def queue_jump(pNm,mId,params)
+  #player/play_queue?pid=2&qid=9
+  SendToPlayer("player/play_queue?pid=#{@@playerDB[pNm][:HeosId]}&qid=#{mId}")
+  return {}
+end
+
+def queue_save(pNm,mId,params)
+  SendToPlayer("player/save_queue?pid=#{@@playerDB[pNm][:HeosId]}&name=#{params["search"]}")
+  return {}
+end
+
 def manage_playing(pNm,mId,params)
   #"player/get_queue?pid=1&range=0,10"
   
   r = SendToPlayer("player/get_now_playing_media?pid=#{@@playerDB[pNm][:HeosId]}")
-  
-  b = []
-  r = SendToPlayer("player/get_queue?pid=#{@@playerDB[pNm][:HeosId]}")
   #puts r
-  if r
-    h = {}
-    h[:id] = "save"
-    h[:cmd] = "queue_save"
-    h[:text] = "Save Playlist"
-    h[:iInput] = true
-
-    b << h
-    r["payload"].each do |s|
-      if s["sid"]
-        id = "sid=#{s["sid"]}"
-      elsif s["mid"]
-        id = "#{mId.split("&cid=")[0]}&mid=#{s["mid"]}"
-      else
-        id = "#{mId.split("&cid=")[0]}&cid=#{s["cid"]}"
-      end
-      #puts s
-      img = s["image_url"] || s["image_uri"]
-      if s["image_url"] == "" && j
-        img = j[s["name"]] || img
-      end
-      if img.include?("opml.radiotime.com")
-        img = ""
-      end
-      #puts img
+  b = []
+  if r && r["payload"]["type"] == "station"
       h = {}
-      h[:id] = s["qid"]
-      h[:cmd] = "queue_jump"
-      h[:text] = "#{s["qid"]}. #{s["song"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})}\n"\
-                 "#{s["artist"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})} - "\
-                 "#{s["album"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})}"
-      h[:icon] = img if img.length > 0
-      h[:iContext] = true
+      h[:id] = "station_favorite"
+      h[:cmd] = "station_favorite"
+      h[:text] = "Add #{r["payload"]["station"]} to Favorites"
+      h[:icon] = r["payload"]["image_url"]
       b << h
+  else
+    r = SendToPlayer("player/get_queue?pid=#{@@playerDB[pNm][:HeosId]}")
+    #puts r
+    if r
+      h = {}
+      h[:id] = "queue_save"
+      h[:cmd] = "queue_save"
+      h[:text] = "Save Playlist"
+      h[:iInput] = true
+  
+      b << h
+      r["payload"].each do |s|
+        if s["sid"]
+          id = "sid=#{s["sid"]}"
+        elsif s["mid"]
+          id = "#{mId.split("&cid=")[0]}&mid=#{s["mid"]}"
+        else
+          id = "#{mId.split("&cid=")[0]}&cid=#{s["cid"]}"
+        end
+        #puts s
+        img = s["image_url"] || s["image_uri"]
+        if s["image_url"] == "" && j
+          img = j[s["name"]] || img
+        end
+        if img.include?("opml.radiotime.com")
+          img = ""
+        end
+        #puts img
+        h = {}
+        h[:id] = s["qid"]
+        h[:cmd] = "queue_jump"
+        h[:text] = "#{s["qid"]}. #{s["song"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})}\n"\
+                   "#{s["artist"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})} - "\
+                   "#{s["album"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})}"
+        h[:icon] = img if img.length > 0
+        h[:iContext] = true
+        b << h
+      end
     end
   end
   return b
