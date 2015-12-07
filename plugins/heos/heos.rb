@@ -187,11 +187,13 @@ def StandardBrowse(mId) #implement count / range
           img = ""
         end
       end
-      #puts img
+      img = "plugins/heos/icons/default" if img.to_s == ""
+      name = s["name"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})
+      name = name + "\n"+s["mid"] if mId == "sid=1028"
       h = {}
       h[:id] = id
       h[:cmd] = s["type"]
-      h[:text] = s["name"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})
+      h[:text] = name
       h[:icon] = img if img.length > 0
       h[:iContext] = true if s["playable"] == "yes"
       b << h
@@ -591,7 +593,9 @@ def selectinput(pNm,mId,params)
 end
 
 def heos_service(pNm,mId,params)
-  return StandardBrowse(mId)
+  m = StandardBrowse(mId)
+  #puts m
+  return m
 end
 
 def music_service(pNm,mId,params)
@@ -743,7 +747,9 @@ def manage_playing(pNm,mId,params)
       h[:iInput] = true
   
       b << h
+      #puts r
       r["payload"].each do |s|
+        
         if s["sid"]
           id = "sid=#{s["sid"]}"
         elsif s["mid"]
