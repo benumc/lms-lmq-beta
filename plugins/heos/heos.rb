@@ -89,8 +89,8 @@ def SendToPlayer(msg)
       @@recBuffer.delete_at(i)
       return r
       break
-    elsif 
-      puts 
+    #elsif 
+      #puts 
     end
     #c = ""
     #m = ""
@@ -270,13 +270,13 @@ def TopMenu(pNm,mId,params)
             :text => 'Now Playing',
             :icon => 'plugins/heos/icons/playing'
           }
-        elsif n == 'groups'
-          b[b.length] = {
-            :id => 'manage_groups',
-            :cmd => 'manage_groups',
-            :text => 'Groups',
-            :icon =>'plugins/heos/icons/groups'
-          }
+#        elsif n == 'groups'
+#          b[b.length] = {
+#            :id => 'manage_groups',
+#            :cmd => 'manage_groups',
+#            :text => 'Groups',
+#            :icon =>'plugins/heos/icons/groups'
+#          }
         elsif n == 'account'
           b[b.length] = {
             :id => 'heos_account',
@@ -615,16 +615,16 @@ def search_menu(pNm,mId,params)
     h[:text] = "Find #{s["name"]}"
     h[:args] = s
     h[:iInput] = true
-    puts h
+    #puts h
     menu << h
   end
   return menu
 end
 
 def search_service(pNm,mId,params)
-  puts "#{__method__}"
-  puts "MID: #{mId}"
-  puts params
+  #puts "#{__method__}"
+  #puts "MID: #{mId}"
+  #puts params
   r = SendToPlayer("#{mId}&search=#{params["search"]}")
   #puts r
   b = []
