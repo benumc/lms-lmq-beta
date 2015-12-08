@@ -187,9 +187,11 @@ def StandardBrowse(mId) #implement count / range
           img = ""
         end
       end
-      img = "plugins/heos/icons/default" if img.to_s == ""
       name = s["name"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})
-      name = name + "\n"+s["mid"] if mId == "sid=1028"
+      if mId == "sid=1028"
+        name = name + "\n"+s["mid"] 
+        img = "plugins/heos/icons/default" if img.to_s == ""
+      end
       h = {}
       h[:id] = id
       h[:cmd] = s["type"]
@@ -272,13 +274,13 @@ def TopMenu(pNm,mId,params)
             :text => 'Now Playing',
             :icon => 'plugins/heos/icons/playing'
           }
-#        elsif n == 'groups'
-#          b[b.length] = {
-#            :id => 'manage_groups',
-#            :cmd => 'manage_groups',
-#            :text => 'Groups',
-#            :icon =>'plugins/heos/icons/groups'
-#          }
+        elsif n == 'groups'
+          b[b.length] = {
+            :id => 'manage_groups',
+            :cmd => 'manage_groups',
+            :text => 'Groups',
+            :icon =>'plugins/heos/icons/groups'
+          }
         elsif n == 'account'
           b[b.length] = {
             :id => 'heos_account',
