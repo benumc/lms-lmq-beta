@@ -446,6 +446,22 @@
                 </command_interface>
                 <execute_on_schedule period_ms="2000"/>
             </action>
+            <action name="PlayFavorite">
+                <action_argument name="FavoriteID" note="Shown under name in favorite name"/>
+                <command_interface interface="ip">
+                    <command response_required="no">
+                        <command_string type="character" http_request_type="POST">jsonrpc.js?</command_string>
+                        <parameter_list>
+                            <parameter parameter_data_type="character" isHttpBody="true">{"id":"1","method":"slim.request","params":["</parameter>
+                            <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
+                            <parameter parameter_data_type="character" isHttpBody="true">",["cmd:playfavorite","id:</parameter>
+                            <parameter parameter_data_type="character" action_argument="FavoriteID" isHttpBody="true"></parameter>
+                            <parameter parameter_data_type="character" isHttpBody="true">"]]}</parameter>
+                        </parameter_list>
+                        <delay ms_delay="200"/>
+                    </command>
+                </command_interface>
+            </action>
             <action name="Favorites">
                 <command_interface interface="ip">
                     <command response_required="no">
