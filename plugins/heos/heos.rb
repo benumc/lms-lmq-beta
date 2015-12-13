@@ -4,6 +4,7 @@ require 'json'
 require 'uri'
 require 'open-uri'
 require 'cgi'
+require 'fileutils'
 
 
 module Heos
@@ -13,9 +14,22 @@ module Heos
   #puts "Heos Loaded!"
 @@heosServerAddress = ""
 @@playerDB = {}
+@@userDB = {}
 @@recBuffer = []
 @@server = false
 @@sock = false
+@@currentUser = ""
+
+@@setDir = Dir.home+"/.lmslmq/plugins/heos"
+FileUtils.mkdir_p(File.dirname(@@setDir+"/acc"))
+
+@@userDB = File.open(@@setDir+"/acc", "rb") {|f| Marshal.load(f)} if File.exist?(@@setDir+"/acc")
+@@playerDB = File.open(@@setDir+"/pla", "rb") {|f| Marshal.load(f)} if File.exist?(@@setDir+"/pla")
+
+def SaveToFile(fl,hsh)
+  File.open(@@setDir+fl, "wb") {|f| Marshal.dump(hsh, f)}
+end
+
 
 def GetServerAddress
   @@server = true
@@ -28,9 +42,9 @@ def GetServerAddress
   @@heosServerAddress = address[2]
   udp.close
   @@sock = TCPSocket.open(@@heosServerAddress,1255)
-  #puts @@heosServerAddress
+  puts "Heos Server: #{@@heosServerAddress}"
 rescue
-  #puts "Could Not Connect to Server. Retry"
+  puts "Could Not Connect to Server. Retrying"
   sleep(1)
   retry
 end
@@ -38,7 +52,7 @@ end
 #Thread.abort_on_exception = true
 def MaintainSocket
   th = Thread.new do
-    #puts "Start Socket"
+    puts "Starting Socket"
     loop do
       begin
         #r = JSON.parse(@@sock.gets)
@@ -108,6 +122,8 @@ rescue
 end
 
 def Login(un,pw)
+  puts "#{__method__}. un:#{un}. pw:#{pw}"
+  SendToPlayer("system/register_for_change_events?enable=on")
   loop do
     r = SendToPlayer("system/sign_in?un=#{un}&pw=#{pw}")
     puts "Login Status: #{r}"
@@ -164,10 +180,12 @@ def StandardBrowse(mId) #implement count / range
   end
   r = SendToPlayer("browse/browse?#{mId}")
   #puts "Received Menu For Parsing :\n#{r}"
+  ids = {}
   b = []
   if r
     r["payload"].each do |s|
       s["name"] = URI.decode(s["name"])
+      next unless s["name"].length > 2
       if s["sid"]
         id = "sid=#{s["sid"]}"
       elsif s["mid"]
@@ -175,6 +193,8 @@ def StandardBrowse(mId) #implement count / range
       else
         id = "#{mId.split("&cid=")[0]}&cid=#{s["cid"]}"
       end
+      next if ids[id]
+      ids[id] = ""
       #puts s
       if mId == "sid=3" #override tunein main menu icons with local ones
         img = "plugins/heos/icons/tunein_#{s["name"].downcase.gsub(" ","+")}"
@@ -188,6 +208,8 @@ def StandardBrowse(mId) #implement count / range
         end
       end
       name = s["name"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})
+      name = "Stations" if name == "STATIONS"
+      name = "Tracks" if name == "TRACKS"
       if mId == "sid=1028"
         name = name + "\n"+s["mid"] 
         img = "plugins/heos/icons/default" if img.to_s == ""
@@ -208,106 +230,94 @@ end
 #Savant Request Handling Below********************
 
 def SavantRequest(hostname,cmd,req)
-  #puts "Hostname:\n#{hostname}\n\nCommand:\n#{cmd}\n\nRequest:\n#{req}" unless cmd == "Status"
+  puts "Hostname:\n#{hostname}\n\nCommand:\n#{cmd}\n\nRequest:\n#{req}" unless cmd == "Status"
   h = Hash[req.select { |e|  e.include?(":")  }.map {|e| e.split(":",2) if e && e.to_s.include?(":")}]
-  unless @@playerDB[hostname["name"]] && @@playerDB[hostname["name"]][:SignedIn]
-    
+  
+  
+  unless @@playerDB[hostname["name"]]# && @@playerDB[hostname["name"]][:SignedIn]
+    SendToPlayer("system/register_for_change_events?enable=on")
     t = hostname["topmenu"].split(":") if hostname["topmenu"]
     @@playerDB[hostname["name"]] = {
-      :SignedIn => Login(hostname["un"],hostname["pw"]),
-      :HeosId => GetPlayerId(hostname["name"]),
-      :Sources => {},
-      :TopMenu => t
+      :HeosId => GetPlayerId(hostname["name"])
     }
-    sh = {}
-    sn = 1
-    if hostname["sources"]
-      r = SendToPlayer("browse/get_music_sources")
-      if s = r["payload"].find {|s| s['name']== "AUX Input"}
-        r = SendToPlayer("browse/browse?sid=#{s["sid"]}")
-        r["payload"].each do |s|
-          rs = SendToPlayer("browse/browse?sid=#{s["sid"]}") || []
-          rs["payload"].each do |sr|
-            sh[sr["name"].downcase] = "sid=#{s["sid"]}&mid=#{sr["mid"]}"
-          end
-        end
-        hostname["sources"].split(":").each do |s|
-          @@playerDB[hostname["name"]][:Sources][sn.to_s] = sh[s]
-          sn = sn + 1
-        end
-      end
+    #sh = {}
+    #sn = 1
+    #if hostname["sources"]
+    #  r = SendToPlayer("browse/get_music_sources")
+    #  if s = r["payload"].find {|s| s['name']== "AUX Input"}
+    #    r = SendToPlayer("browse/browse?sid=#{s["sid"]}")
+    #    r["payload"].each do |s|
+    #      rs = SendToPlayer("browse/browse?sid=#{s["sid"]}") || []
+    #      rs["payload"].each do |sr|
+    #        sh[sr["name"].downcase] = "sid=#{s["sid"]}&mid=#{sr["mid"]}"
+    #      end
+    #    end
+    #    hostname["sources"].split(":").each do |s|
+    #      @@playerDB[hostname["name"]][:Sources][sn.to_s] = sh[s]
+    #      sn = sn + 1
+    #    end
+    #  end
     end
     #puts @@playerDB
     
-    SendToPlayer("system/register_for_change_events?enable=on")
-  end
+  #end
   
-  return nil unless @@playerDB[hostname["name"]][:SignedIn]
+  #return nil unless @@playerDB[hostname["name"]][:SignedIn]
   
   #puts "Sending Command: #{cmd}"
-  return send(cmd,hostname["name"],h["id"],h)
+  r = send(cmd,hostname["name"],h["id"],h)
+  puts "Returning: #{r}" unless cmd == "Status"
+  return r
 rescue
   return nil
 end
 
 def TopMenu(pNm,mId,params)
   r = SendToPlayer("browse/get_music_sources")
-  #puts r
+  puts r
+  
   b = []
+  b[b.length] = {
+    :id => 'manage_playing',
+    :cmd => 'manage_playing',
+    :text => 'Now Playing',
+    :icon => 'plugins/heos/icons/playing'
+  }
+  #b[b.length] = {
+  #  :id => 'manage_groups',
+  #  :cmd => 'manage_groups',
+  #  :text => 'Groups',
+  #  :icon =>'plugins/heos/icons/groups'
+  #}
   if r
-    if @@playerDB[pNm][:TopMenu]
-      @@playerDB[pNm][:TopMenu].each do |n|
         #puts n.inspect
-        if s = r["payload"].find { |s| s['name'].downcase == n }
           #puts n
-          b[b.length] = {
-            :id =>"sid=#{s["sid"]}",
-            :cmd =>s["type"],
-            :text =>s["name"],
-            :icon =>"plugins/heos/icons/#{s["name"].downcase.gsub(" ","+")}",
-            :args =>"browse/get_search_criteria?sid=#{s["sid"]}"
-          }
-        elsif n == 'queue'
-          b[b.length] = {
-            :id => 'manage_playing',
-            :cmd => 'manage_playing',
-            :text => 'Now Playing',
-            :icon => 'plugins/heos/icons/playing'
-          }
-        elsif n == 'groups'
-          b[b.length] = {
-            :id => 'manage_groups',
-            :cmd => 'manage_groups',
-            :text => 'Groups',
-            :icon =>'plugins/heos/icons/groups'
-          }
-        elsif n == 'account'
-          b[b.length] = {
-            :id => 'heos_account',
-            :cmd => 'heos_account',
-            :text => 'Heos Account',
-            :icon => 'plugins/heos/icons/heos+account'
-          }
-        end
-      end
-    else
-      r["payload"].each do |s|
-        #browse/get_search_criteria?sid=#{s}
-        b[b.length] = {
-          :id =>"sid=#{s["sid"]}",
-          :cmd =>s["type"],
-          :text =>s["name"],
-          :icon =>"plugins/heos/icons/#{s["name"].downcase.gsub(" ","+")}",
-          :args =>"browse/get_search_criteria?sid=#{s["sid"]}"
-        }
-      end
+    r["payload"].each do |s|
+      #browse/get_search_criteria?sid=#{s}
+      b[b.length] = {
+        :id =>"sid=#{s["sid"]}",
+        :cmd =>s["type"],
+        :text =>s["name"],
+        :icon =>"plugins/heos/icons/#{s["name"].downcase.gsub(" ","+")}",
+        :args =>"browse/get_search_criteria?sid=#{s["sid"]}"
+      }
     end
   end
+  #r = SendToPlayer("system/check_account")
+  #m = "Heos (#{r["heos"]["message"].split("=")[1] || "Sign-In"})"
+  
+  b[b.length] = {
+    :id => 'heos_account',
+    :cmd => 'heos_account',
+    :text => 'Heos Account',
+    :icon => 'plugins/heos/icons/heos+account'
+  }
+  
   return b
 end
 
 def Status(pNm,mId,params)
-
+  #puts "#{__method__}: #{mId}\n#{params}"
   return {} unless @@playerDB[pNm] && @@playerDB[pNm][:HeosId]
   unless @@playerDB[pNm][:PlayState]
     r = SendToPlayer("player/get_play_state?pid=#{@@playerDB[pNm][:HeosId]}")
@@ -383,7 +393,6 @@ def Status(pNm,mId,params)
       :Repeat => repeat,
       :Shuffle => shuffle
     }
-    #puts body
   return body
 end
 
@@ -392,17 +401,19 @@ def ContextMenu(pNm,mId,params)
   #puts "Context"
 puts "#{__method__} Debug: MID - #{mId} : Params - #{params}"
   case params["cmd"]
-  when "container", "album", artist
+  when "container", "album", "artist", "song"
     b = [{:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=1",:cmd=>"cmd:queue",:text=>"Play Now"},
          {:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=2",:cmd=>"cmd:queue",:text=>"Play Next"},
          {:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=3",:cmd=>"cmd:queue",:text=>"Add To Queue"},
          {:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=4",:cmd=>"cmd:queue",:text=>"Replace Queue"}]
   #puts b
-  when "queue_jump"
-    b = [{:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=1",:cmd=>"cmd:queue",:text=>"Play Now"},
-         {:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=2",:cmd=>"cmd:queue",:text=>"Remove  from Queue"}]
+  when "queue_jump"#player/play_queue?pid=2&qid=9 player/remove_from_queue?pid=1&qid=4
+    b = [{:id=>"browse/play_queue?pid=#{@@playerDB[pNm][:HeosId]}&qid=#{mId}",:cmd=>"cmd:queue",:text=>"Play Now"},
+         {:id=>"browse/remove_from_queue?pid=#{@@playerDB[pNm][:HeosId]}&qid=#{mId}",:cmd=>"cmd:queue",:text=>"Remove from Queue"}]
    when "station"
-     b = [{:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=1",:cmd=>"cmd:queue",:text=>"Play Now"}]
+     b = [{:id=>"browse/browse/play_stream?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}",:cmd=>"cmd:queue",:text=>"Play Now"}]
+   when "heos_login"
+     b = [{:id=>mId,:cmd=>"cmd:remove_account",:text=>"Remove Account"}]
   end
   return b
 end
@@ -709,7 +720,7 @@ puts params
 end
 
 def queue(pNm,mId,params)
-  #puts "Queuing"
+  puts "#{__method__}: #{mId}\n#{params}"
   SendToPlayer(mId)
   return {}
 end
@@ -723,6 +734,64 @@ end
 def queue_save(pNm,mId,params)
   SendToPlayer("player/save_queue?pid=#{@@playerDB[pNm][:HeosId]}&name=#{params["search"]}")
   return {}
+end
+
+def heos_account(pNm,mId,params)
+  b = []
+  
+  r = SendToPlayer("system/check_account")
+  c = r["heos"]["message"].split("=")[1]
+  @@userDB.each do |u,p|
+    n = u
+    n = "* #{u}" if u == c
+    b << {:id=>u,:cmd=>"heos_login",:text=>n,:iContext=>true} unless u == :current
+    
+  end
+  b << {:id=>"add_account",:cmd=>"add_account",:text=>"Add Account",:iInput=>true}
+  return b
+end
+
+def remove_account(pNm,mId,params)
+  puts "#{__method__}: #{mId}\n#{params}"
+  @@userDB.delete(mId)
+  r = SendToPlayer("system/check_account")
+  m = r["heos"]["message"].split("=")[1]
+  if mId == m
+    SendToPlayer("system/sign_out")
+  end
+  SaveToFile("/acc",@@userDB)
+  return {}
+end
+
+def heos_login(pNm,mId,params)
+  puts "#{__method__}: #{mId}\n#{params}"
+  r = Login(mId,@@userDB[mId])
+  if r
+    @@userDB[:current] = @@currentUser
+    SaveToFile("/acc",@@userDB)
+    return [{:id=>"success",:cmd=>"success",:text=>"Success"}]
+  else
+    return [{:id=>"fail",:cmd=>"fail",:text=>"Fail"}]
+  end
+end
+
+def add_account(pNm,mId,params)
+  puts "#{__method__}: #{mId}\n#{params}"
+  @@currentUser = params["search"]
+  return [{:id=>"get_pass",:cmd=>"get_pass",:text=>"Password",:iInput=>true}]
+end
+
+def get_pass(pNm,mId,params)
+  puts "#{__method__}: #{mId}\n#{params}"
+  r = Login(@@currentUser,params["search"])
+  if r
+    @@userDB[@@currentUser] = params["search"]
+    @@userDB[:current] = @@currentUser
+    SaveToFile("/acc",@@userDB)
+    return [{:id=>"success",:cmd=>"success",:text=>"Success"}]
+  else
+    return [{:id=>"fail",:cmd=>"fail",:text=>"Fail"}]
+  end
 end
 
 def manage_playing(pNm,mId,params)

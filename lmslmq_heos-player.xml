@@ -61,28 +61,6 @@
         <volume_state_variable name="Volume_current_volume" min_value="0" max_value="100" owning_logical_component="Media_server" granularity="1.00000" state_center_binding="CurrentVolume" state_center_type="percent_escaped_string">0</volume_state_variable>
         <state_variable name="PlayerInfoSent" state_center_binding="PlayerInfoSent" owning_logical_component="Media_server">0</state_variable>
         <state_variable name="LoadPlugin" state_center_binding="LoadPlugin" state_center_type="string" receive_updates_from_state_center="no" user_editable="no" owning_logical_component="Media_server">Heos</state_variable>
-        <state_variable name="HeosIpAddress" state_center_binding="HeosIpAddress" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
-        <state_variable name="HeosUser" state_center_binding="HeosUser" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">user@email.com</state_variable>
-        <state_variable name="HeosPassword" state_center_binding="HeosPassword" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">password</state_variable>
-        <state_variable name="TopMenu1" state_center_binding="TopMenu1" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">groups</state_variable>
-        <state_variable name="TopMenu2" state_center_binding="TopMenu2" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">queue</state_variable>
-        <state_variable name="TopMenu3" state_center_binding="TopMenu3" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">rdio</state_variable>
-        <state_variable name="TopMenu4" state_center_binding="TopMenu4" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">deezer</state_variable>
-        <state_variable name="TopMenu5" state_center_binding="TopMenu5" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">tunein</state_variable>
-        <state_variable name="TopMenu6" state_center_binding="TopMenu6" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">soundcloud</state_variable>
-        <state_variable name="TopMenu7" state_center_binding="TopMenu7" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">favorites</state_variable>
-        <state_variable name="TopMenu8" state_center_binding="TopMenu8" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">playlists</state_variable>
-        <state_variable name="TopMenu9" state_center_binding="TopMenu9" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server">history</state_variable>
-        <state_variable name="TopMenu10" state_center_binding="TopMenu10" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
-        <state_variable name="TopMenu11" state_center_binding="TopMenu11" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
-        <state_variable name="TopMenu12" state_center_binding="TopMenu12" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
-        <state_variable name="TopMenu13" state_center_binding="TopMenu13" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
-        <state_variable name="TopMenu14" state_center_binding="TopMenu14" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
-        <state_variable name="TopMenu15" state_center_binding="TopMenu15" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
-        <state_variable name="TopMenu16" state_center_binding="TopMenu16" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
-        <state_variable name="TopMenu17" state_center_binding="TopMenu17" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
-        <state_variable name="TopMenu18" state_center_binding="TopMenu18" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
-        <state_variable name="TopMenu19" state_center_binding="TopMenu19" state_center_type="string" receive_updates_from_state_center="yes" user_editable="yes" owning_logical_component="Media_server"></state_variable>
     </state_variable_list>
     <logical_component logical_component_name="Media_server">
         <implementation>
@@ -397,48 +375,6 @@
                             <parameter name="UID" state_variable="UID" parameter_data_type="character" isHttpBody="true"/>
                             <parameter parameter_data_type="character" isHttpBody="true">,cmd:playerinfo,plugin:</parameter>
                             <parameter parameter_data_type="character" state_variable="LoadPlugin" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">,un:</parameter>
-                            <parameter parameter_data_type="character" state_variable="HeosUser" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">,pw:</parameter>
-                            <parameter parameter_data_type="character" state_variable="HeosPassword" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">,topmenu:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu1" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu2" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu3" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu4" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu5" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu6" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu7" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu8" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu9" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu10" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu11" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu12" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu13" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu14" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu15" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu16" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu17" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu18" isHttpBody="true"></parameter>
-                            <parameter parameter_data_type="character" isHttpBody="true">:</parameter>
-                            <parameter parameter_data_type="character" state_variable="TopMenu19" isHttpBody="true"></parameter>
                             <parameter parameter_data_type="character" isHttpBody="true">"]}</parameter>
                         </parameter_list>
                         <delay ms_delay="200"/>
