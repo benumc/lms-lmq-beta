@@ -5,6 +5,7 @@ require 'uri'
 require 'open-uri'
 require 'cgi'
 require 'fileutils'
+require 'base64'
 
 
 module Heos
@@ -24,7 +25,6 @@ module Heos
 FileUtils.mkdir_p(File.dirname(@@setDir+"/acc"))
 
 @@userDB = File.open(@@setDir+"/acc", "rb") {|f| Marshal.load(f)} if File.exist?(@@setDir+"/acc")
-@@playerDB = File.open(@@setDir+"/pla", "rb") {|f| Marshal.load(f)} if File.exist?(@@setDir+"/pla")
 
 def SaveToFile(fl,hsh)
   File.open(@@setDir+fl, "wb") {|f| Marshal.dump(hsh, f)}
@@ -42,8 +42,19 @@ def GetServerAddress
   @@heosServerAddress = address[2]
   udp.close
   @@sock = TCPSocket.open(@@heosServerAddress,1255)
+  
   puts "Heos Server: #{@@heosServerAddress}"
+  @@sock.puts("heos://system/register_for_change_events?enable=off")
+  sleep(0.5)
+  if @@userDB[:current] && @@userDB[@@userDB[:current]]
+    @@sock.puts("heos://system/sign_in?un=#{@@userDB[:current]}&pw=#{@@userDB[@@userDB[:current]]}")
+  end
+  sleep(0.5)
+  @@sock.puts("heos://players/get_players")
+  sleep(0.5)
+  @@sock.puts("heos://system/register_for_change_events?enable=on")
 rescue
+  puts $!, $@
   puts "Could Not Connect to Server. Retrying"
   sleep(1)
   retry
@@ -65,6 +76,13 @@ def MaintainSocket
         #m ||= ""
         if r.include?("command under process")
           #ignore and continue
+        elsif r.include?('players/get_players')
+          r = JSON.parse(r)
+          r["payload"].each do |p|
+            n = p["name"].downcase
+            @@playerDB[n] = {:HeosId => p["pid"]}
+          end
+          puts @@playerDB
         elsif r.include?('"command": "event/')
           #puts "Found Event: #{r}"
           r = JSON.parse(r)
@@ -78,7 +96,7 @@ def MaintainSocket
           @@recBuffer << r
         end
       rescue
-        #puts $!, $@
+        puts $!, $@
         GetServerAddress()
         retry
       end
@@ -116,19 +134,21 @@ def SendToPlayer(msg)
     sleep(0.5)
   end
 rescue
-  #puts $!, $@
+  puts $!, $@
   sleep(1)
   retry
 end
 
 def Login(un,pw)
   puts "#{__method__}. un:#{un}. pw:#{pw}"
-  SendToPlayer("system/register_for_change_events?enable=on")
   loop do
     r = SendToPlayer("system/sign_in?un=#{un}&pw=#{pw}")
     puts "Login Status: #{r}"
-    return true if r["heos"]["result"]=="success"
-    return false if r["heos"]["result"]=="fail"
+    if r["heos"]["result"]=="success"
+      return true
+    else
+      return false
+    end
     sleep(1)
   end
   #r = SendToPlayer("system/check_account")
@@ -137,18 +157,6 @@ def Login(un,pw)
   #  r = SendToPlayer("system/check_account")
   #end
   #return true
-end
-
-def GetPlayerId(devName)
-  r = SendToPlayer("players/get_players")
-  if r
-    r["payload"].each do |s|
-      if s["name"].downcase == devName
-        return s["pid"]
-      end
-    end
-  end
-  return nil
 end
 
   #Server Command Handling Below
@@ -165,19 +173,85 @@ def Stop(playerId)
 puts "#{__method__} Not Implemented: MID - #{mId} : Params - #{params}"
 end
 
-def StandardBrowse(mId) #implement count / range   
-  #puts "Get Menu From Heos :\n#{mId}"
-  m = mId.split("&cid=")
-  if m[1] && m[1].include?("http")
-    url = URI.decode(URI.decode(URI.decode(m[1])))
-    mId = "#{m[0]}&cid=#{CGI.escape(url)}"
-    rt = JSON.parse(open(url).read)["body"]
-    if rt
-      n = []
-      rt.each{|h| h["children"].each{|h1| n << h1} if h["children"]}
-      j = Hash[n.map{|e| [e["text"],e["image"]] }] 
+def ParseMenu(msg,mId)
+  puts msg
+  r = SendToPlayer(msg)
+  puts r.inspect
+  ids = {}
+  b = []
+  if r
+    m = Hash[r["heos"]["message"].split("&").map {|e|e.split("=")}]
+    r["payload"].each do |s|
+      puts s.inspect
+      name = URI.decode(s["name"]).encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})
+      name = "Stations" if name == "STATIONS"
+      name = "Tracks" if name == "TRACKS"
+      next unless s["name"].length > 2
+      sid = m["sid"] if m["sid"]
+      sid = s["sid"] if s["sid"]
+      id = "sid=#{sid}"
+      id << "&cid=#{s["cid"]}" if s["cid"]
+      id << "&mid=#{s["mid"]}" if s["mid"]
+      id << "&scid=#{m["scid"]}" if m["scid"]
+      #id << "&name=#{s["name"]}" if s["name"]
+      id << "&spid=#{s["sid"]}" if s["sid"]
+      id << "&input=#{s["mid"]}" if s["mid"]
+      if mId == "sid=3" #override tunein main menu icons with local ones
+        img = "plugins/heos/icons/tunein_#{s["name"].downcase.gsub(" ","+")}"
+      else
+        img = s["image_url"] || s["image_uri"]
+        img = j[s["name"]] || img if s["image_url"] == "" && j
+        img = "" if img.include?("opml.radiotime.com")
+        img = "plugins/heos/icons/default" if img.to_s == "" && mId == "sid=1028"
+      end
+      h = {}
+      h[:id] = Base64.strict_encode64(id)
+      h[:cmd] = s["type"]
+      h[:text] = name
+      h[:icon] = img if img.length > 0
+      h[:iContext] = true if s["playable"] == "yes"
+      b << h
+    end
+    rC = m["returned"].to_i #items returned
+    rT = m["count"].to_i #items available
+    rS = m["range"].split(",")[0] + rT if m["range"]# last previous item
+    rS = rS.to_i
+    if  rC != rT && rT > rS
+      #add a next page request here
+      m[range] = "#{rs},#{rs+50}"
+      id = m.map {|e| e.join("=")}.join("&")
+      h = {}
+      h[:id] = Base64.strict_encode64(id)
+      h[:cmd] = "container"
+      h[:text] = "Next Page"
+      h[:icon] = "plugins/heos/icons/default"
+      b << h
     end
   end
+  return b
+  rescue
+    puts $!, $@
+end
+
+def StandardBrowse(mId)
+  return ParseMenu("browse/browse?#{mId}",mId)
+  rescue
+    puts $!, $@
+end
+
+def oldStandardBrowse(mId) #implement count / range   
+  #puts "Get Menu From Heos :\n#{mId}"
+  m = mId.split("&cid=")
+  #if m[1] && m[1].include?("http")
+  #  url = URI.decode(URI.decode(URI.decode(m[1])))
+  #  mId = "#{m[0]}&cid=#{CGI.escape(url)}"
+  #  rt = JSON.parse(open(url).read)["body"]
+  #  if rt
+  #    n = []
+  #    rt.each{|h| h["children"].each{|h1| n << h1} if h["children"]}
+  #    j = Hash[n.map{|e| [e["text"],e["image"]] }] 
+  #  end
+  #end
   r = SendToPlayer("browse/browse?#{mId}")
   #puts "Received Menu For Parsing :\n#{r}"
   ids = {}
@@ -191,7 +265,8 @@ def StandardBrowse(mId) #implement count / range
       elsif s["mid"]
         id = "#{mId.split("&cid=")[0]}&mid=#{s["mid"]}"
       else
-        id = "#{mId.split("&cid=")[0]}&cid=#{s["cid"]}"
+        #id = mId
+        id = "#{m[0]}&cid=#{s["cid"]}"
       end
       next if ids[id]
       ids[id] = ""
@@ -234,45 +309,21 @@ def SavantRequest(hostname,cmd,req)
   h = Hash[req.select { |e|  e.include?(":")  }.map {|e| e.split(":",2) if e && e.to_s.include?(":")}]
   
   
-  unless @@playerDB[hostname["name"]]# && @@playerDB[hostname["name"]][:SignedIn]
-    SendToPlayer("system/register_for_change_events?enable=on")
-    t = hostname["topmenu"].split(":") if hostname["topmenu"]
-    @@playerDB[hostname["name"]] = {
-      :HeosId => GetPlayerId(hostname["name"])
-    }
-    #sh = {}
-    #sn = 1
-    #if hostname["sources"]
-    #  r = SendToPlayer("browse/get_music_sources")
-    #  if s = r["payload"].find {|s| s['name']== "AUX Input"}
-    #    r = SendToPlayer("browse/browse?sid=#{s["sid"]}")
-    #    r["payload"].each do |s|
-    #      rs = SendToPlayer("browse/browse?sid=#{s["sid"]}") || []
-    #      rs["payload"].each do |sr|
-    #        sh[sr["name"].downcase] = "sid=#{s["sid"]}&mid=#{sr["mid"]}"
-    #      end
-    #    end
-    #    hostname["sources"].split(":").each do |s|
-    #      @@playerDB[hostname["name"]][:Sources][sn.to_s] = sh[s]
-    #      sn = sn + 1
-    #    end
-    #  end
-    end
-    #puts @@playerDB
-    
-  #end
-  
-  #return nil unless @@playerDB[hostname["name"]][:SignedIn]
-  
   #puts "Sending Command: #{cmd}"
+  
+  h["id"] = Base64.decode64(h["id"]) if h["id"] && h["id"].match(/^([A-Za-z0-9+\/]{4})*([A-Za-z0-9+\/]{4}|[A-Za-z0-9+\/]{3}=|[A-Za-z0-9+\/]{2}==)$/)
   r = send(cmd,hostname["name"],h["id"],h)
-  puts "Returning: #{r}" unless cmd == "Status"
+  #puts "Returning: #{r}" unless cmd == "Status"
   return r
 rescue
+  
+    puts $!, $@
   return nil
 end
 
 def TopMenu(pNm,mId,params)
+  puts "#{__method__}: #{mId}\n#{params}"
+  return [{:id => 'heos_account',:cmd => 'heos_account',:text => 'Heos Account',:icon => 'plugins/heos/icons/heos+account'}] if @@userDB[:current].to_s == ""
   r = SendToPlayer("browse/get_music_sources")
   puts r
   
@@ -303,8 +354,6 @@ def TopMenu(pNm,mId,params)
       }
     end
   end
-  #r = SendToPlayer("system/check_account")
-  #m = "Heos (#{r["heos"]["message"].split("=")[1] || "Sign-In"})"
   
   b[b.length] = {
     :id => 'heos_account',
@@ -318,6 +367,7 @@ end
 
 def Status(pNm,mId,params)
   #puts "#{__method__}: #{mId}\n#{params}"
+  #puts @@playerDB[pNm].inspect
   return {} unless @@playerDB[pNm] && @@playerDB[pNm][:HeosId]
   unless @@playerDB[pNm][:PlayState]
     r = SendToPlayer("player/get_play_state?pid=#{@@playerDB[pNm][:HeosId]}")
@@ -340,11 +390,12 @@ def Status(pNm,mId,params)
     @@playerDB[pNm][:Alb] = r["payload"]["album_id"]
   end
   
-  if @@playerDB[pNm][:Artwork].to_s == ''
+  if @@playerDB[pNm][:Artwork].to_s == '' && @@playerDB[pNm][:Sid] && @@playerDB[pNm][:Alb] && @@playerDB[pNm][:Alb].include?("Alb.")
     r = SendToPlayer("browse/retrieve_metadata?sid=#{@@playerDB[pNm][:Sid]}&cid=#{@@playerDB[pNm][:Alb]}")
     @@playerDB[pNm][:Artwork] = r["payload"][0]["images"][-1]["image_url"] rescue ""
   end
-  
+   @@playerDB[pNm][:Artwork] = "/plugins/heos/icons/default" if @@playerDB[pNm][:Artwork].to_s == ''
+   
   #puts @@playerDB[pNm][:Volume]
   unless @@playerDB[pNm][:Volume]
     r = SendToPlayer("player/get_volume?pid=#{@@playerDB[pNm][:HeosId]}")
@@ -394,6 +445,8 @@ def Status(pNm,mId,params)
       :Shuffle => shuffle
     }
   return body
+  rescue
+    puts $!, $@
 end
 
 
@@ -607,11 +660,12 @@ end
 
 def heos_service(pNm,mId,params)
   m = StandardBrowse(mId)
-  #puts m
+  puts m
   return m
 end
 
 def music_service(pNm,mId,params)
+  
   menu = StandardBrowse(mId)
   #puts menu
   h = {}
@@ -639,24 +693,25 @@ def search_menu(pNm,mId,params)
 end
 
 def search_service(pNm,mId,params)
-  #puts "#{__method__}"
-  #puts "MID: #{mId}"
-  #puts params
-  r = SendToPlayer("#{mId}&search=#{params["search"]}")
-  #puts r
+  return ParseMenu("#{mId}&search=#{params["search"]}",mId)
+end
+
+def OLDsearch_service(pNm,mId,params)
+  puts "#{__method__}: #{mId}\n#{params}"
+  #
+  ##puts r
   b = []
   
     r["payload"].each do |s|
       s["name"] = URI.decode(s["name"])
       
-      #if s["sid"]
-      #  id = "sid=#{s["sid"]}"
-      #elsif s["mid"]
-      #  id = "#{mId.split("&cid=")[0]}&mid=#{s["mid"]}"
-      #else
-      #  id = "#{mId.split("&cid=")[0]}&cid=#{s["cid"]}"
-      #end
-      
+      if s["sid"]
+        id = "sid=#{s["sid"]}"
+      elsif s["mid"]
+        id = "#{mId.split("&cid=")[0]}&mid=#{s["mid"]}"
+      else
+        id = "#{mId.split("&cid=")[0]}&cid=#{s["cid"]}"
+      end
       id = "#{mId.match(/.+?\?([^\&]+)&.+/).captures[0]}&cid=#{s["cid"]}"
       
       #puts s
@@ -670,11 +725,12 @@ def search_service(pNm,mId,params)
       #puts img
       
       h = {}
-      h[:id] = id
+      h[:id] = Base64.strict_encode64(id)
       h[:cmd] = s["type"]
       h[:text] = s["name"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})
       h[:icon] = img if img.length > 0
       h[:iContext] = true if s["playable"] == "yes"
+      h[:args] = s
       b << h
       
     end
@@ -687,6 +743,8 @@ def heos_server(pNm,mId,params)
 end
 
 def container(pNm,mId,params)
+  #sid=3&cid=http%3A//opml.radiotime.com/Browse.ashx%3Ffilter%3Dp%253Atopic&serial%3D00%253A05%253Acd%253A48%253A07%253Adc&id%3Dc100000148&render%3Djson&formats%3Daac%252Cmp3%252Cwma
+  #sid=3&cid=http%3A//opml.radiotime.com/Browse.ashx%3Ffilter%3Dp%253Atopic%26serial%3D00%253A05%253Acd%253A48%253A07%253Adc%26id%3Dc100000148%26render%3Djson%26formats%3Daac%252Cmp3%252Cwma
   return StandardBrowse(mId)
 end
 
@@ -703,18 +761,27 @@ def genre(pNm,mId,params)
 end
 
 def station(pNm,mId,params)
-  SendToPlayer("browse/play_stream?#{mId}&pid=#{@@playerDB[pNm][:HeosId]}")
+  puts "#{__method__}: #{mId}\n#{params}"
+  if mId.include?("inputs")
+    SendToPlayer("browse/play_input?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}")
+  else
+    SendToPlayer("browse/play_stream?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}")
+  end
   return {}
 end
 
 def station_favorite(pNm,mId,params)
+  puts "#{__method__}: #{mId}\n#{params}"
   SendToPlayer("browse/set_service_option?option=19&pid=#{@@playerDB[pNm][:HeosId]}")
   return {}
 end
 
 def song(pNm,mId,params)
-puts "#{__method__} Partially Implemented: #{msg}"
-puts params
+  #sid=3&mid=http%3A%2F%2Fopml.radiotime.com%2FTune.ashx%3Fid%253Dt102382338%2526sid%253Dp644440%2526formats%253Daac%2Cmp3%2Cwma%2526partnerId%253DyYVQhZ%21D%2526serial%253D00%3A05%3Acd%3A48%3A07%3Adc
+  #sid=3&mid=http://opml.radiotime.com/Tune.ashx?id%3Dt102382338&sid%3Dp644440&formats%3Daac,mp3,wma&partnerId%3DyYVQhZ!D&serial%3D00:05:cd:48:07:dc
+  #          http://opml.radiotime.com/Tune.ashx?id%3Dt41378256%26sid%3Dp393605%26formats%3Daac,mp3,wma%26partnerId%3DyYVQhZ!D%26serial%3D00:05:cd:48:07:dc
+  #sid=3&mid=http://opml.radiotime.com/Tune.ashx?id%3Dt41378256%26sid%3Dp393605%26formats%3Daac,mp3,wma%26partnerId%3DyYVQhZ!D%26serial%3D00:05:cd:48:07:dc
+  puts "#{__method__}: #{mId}\n#{params}"
   SendToPlayer("browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=1")
   return {}
 end
@@ -758,6 +825,7 @@ def remove_account(pNm,mId,params)
   m = r["heos"]["message"].split("=")[1]
   if mId == m
     SendToPlayer("system/sign_out")
+    @@userDB[:current] = nil
   end
   SaveToFile("/acc",@@userDB)
   return {}
@@ -767,7 +835,7 @@ def heos_login(pNm,mId,params)
   puts "#{__method__}: #{mId}\n#{params}"
   r = Login(mId,@@userDB[mId])
   if r
-    @@userDB[:current] = @@currentUser
+    @@userDB[:current] = mId
     SaveToFile("/acc",@@userDB)
     return [{:id=>"success",:cmd=>"success",:text=>"Success"}]
   else
@@ -802,7 +870,7 @@ def manage_playing(pNm,mId,params)
   b = []
   if r && r["payload"]["type"] == "station"
       h = {}
-      h[:id] = "station_favorite"
+      h[:id] = "player/get_now_playing_media?pid=#{@@playerDB[pNm][:HeosId]}&id=19"
       h[:cmd] = "station_favorite"
       h[:text] = "Add #{r["payload"]["station"]} to Favorites"
       h[:icon] = r["payload"]["image_url"]
