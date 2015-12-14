@@ -43,7 +43,7 @@ def GetServerAddress
   udp.close
   @@sock = TCPSocket.open(@@heosServerAddress,1255)
   
-  puts "Heos Server: #{@@heosServerAddress}"
+  #puts "Heos Server: #{@@heosServerAddress}"
   @@sock.puts("heos://system/register_for_change_events?enable=off")
   sleep(0.5)
   if @@userDB[:current] && @@userDB[@@userDB[:current]]
@@ -54,8 +54,8 @@ def GetServerAddress
   sleep(0.5)
   @@sock.puts("heos://system/register_for_change_events?enable=on")
 rescue
-  puts $!, $@
-  puts "Could Not Connect to Server. Retrying"
+   puts $!, $@
+  #puts "Could Not Connect to Server. Retrying"
   sleep(1)
   retry
 end
@@ -63,7 +63,7 @@ end
 #Thread.abort_on_exception = true
 def MaintainSocket
   th = Thread.new do
-    puts "Starting Socket"
+    #puts "Starting Socket"
     loop do
       begin
         #r = JSON.parse(@@sock.gets)
@@ -82,7 +82,7 @@ def MaintainSocket
             n = p["name"].downcase
             @@playerDB[n] = {:HeosId => p["pid"]}
           end
-          puts @@playerDB
+          #puts @@playerDB
         elsif r.include?('"command": "event/')
           #puts "Found Event: #{r}"
           r = JSON.parse(r)
@@ -96,7 +96,7 @@ def MaintainSocket
           @@recBuffer << r
         end
       rescue
-        puts $!, $@
+         puts $!, $@
         GetServerAddress()
         retry
       end
@@ -134,16 +134,16 @@ def SendToPlayer(msg)
     sleep(0.5)
   end
 rescue
-  puts $!, $@
+   puts $!, $@
   sleep(1)
   retry
 end
 
 def Login(un,pw)
-  puts "#{__method__}. un:#{un}. pw:#{pw}"
+  #puts "#{__method__}. un:#{un}. pw:#{pw}"
   loop do
     r = SendToPlayer("system/sign_in?un=#{un}&pw=#{pw}")
-    puts "Login Status: #{r}"
+    #puts "Login Status: #{r}"
     if r["heos"]["result"]=="success"
       return true
     else
@@ -174,15 +174,16 @@ puts "#{__method__} Not Implemented: MID - #{mId} : Params - #{params}"
 end
 
 def ParseMenu(msg,mId)
-  puts msg
+  #puts msg
   r = SendToPlayer(msg)
-  puts r.inspect
+  #puts r.inspect
+  #puts r["heos"]
   ids = {}
   b = []
   if r
     m = Hash[r["heos"]["message"].split("&").map {|e|e.split("=")}]
     r["payload"].each do |s|
-      puts s.inspect
+      #puts s.inspect
       name = URI.decode(s["name"]).encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})
       name = "Stations" if name == "STATIONS"
       name = "Tracks" if name == "TRACKS"
@@ -214,29 +215,32 @@ def ParseMenu(msg,mId)
     end
     rC = m["returned"].to_i #items returned
     rT = m["count"].to_i #items available
-    rS = m["range"].split(",")[0] + rT if m["range"]# last previous item
+    #puts m.inspect
+    rS = m["range"].split(",")[0].to_i if m["range"]# last previous item
     rS = rS.to_i
+    #puts "Returned: #{rC}, Available: #{rT}, Previous Start: #{rS}"
     if  rC != rT && rT > rS
       #add a next page request here
-      m[range] = "#{rs},#{rs+50}"
+      m["range"] = "#{rS+rC},#{rS+rC+rC-1}"
       id = m.map {|e| e.join("=")}.join("&")
+      #puts id
       h = {}
       h[:id] = Base64.strict_encode64(id)
       h[:cmd] = "container"
-      h[:text] = "Next Page"
+      h[:text] = "Next Page >>"
       h[:icon] = "plugins/heos/icons/default"
       b << h
     end
   end
   return b
   rescue
-    puts $!, $@
+     puts $!, $@
 end
 
 def StandardBrowse(mId)
   return ParseMenu("browse/browse?#{mId}",mId)
   rescue
-    puts $!, $@
+     puts $!, $@
 end
 
 def oldStandardBrowse(mId) #implement count / range   
@@ -305,7 +309,7 @@ end
 #Savant Request Handling Below********************
 
 def SavantRequest(hostname,cmd,req)
-  puts "Hostname:\n#{hostname}\n\nCommand:\n#{cmd}\n\nRequest:\n#{req}" unless cmd == "Status"
+  #puts "Hostname:\n#{hostname}\n\nCommand:\n#{cmd}\n\nRequest:\n#{req}" unless cmd == "Status"
   h = Hash[req.select { |e|  e.include?(":")  }.map {|e| e.split(":",2) if e && e.to_s.include?(":")}]
   
   
@@ -317,15 +321,15 @@ def SavantRequest(hostname,cmd,req)
   return r
 rescue
   
-    puts $!, $@
+     puts $!, $@
   return nil
 end
 
 def TopMenu(pNm,mId,params)
-  puts "#{__method__}: #{mId}\n#{params}"
+  #puts "#{__method__}: #{mId}\n#{params}"
   return [{:id => 'heos_account',:cmd => 'heos_account',:text => 'Heos Account',:icon => 'plugins/heos/icons/heos+account'}] if @@userDB[:current].to_s == ""
   r = SendToPlayer("browse/get_music_sources")
-  puts r
+  #puts r
   
   b = []
   b[b.length] = {
@@ -384,6 +388,7 @@ def Status(pNm,mId,params)
     @@playerDB[pNm][:Info] << r["payload"]["artist"]#"[#{sh}#{re}]"
     @@playerDB[pNm][:Info] << r["payload"]["album"]
     @@playerDB[pNm][:Info] << r["payload"]["station"]
+    @@playerDB[pNm][:Info] = @@playerDB[pNm][:Info].uniq
     @@playerDB[pNm][:Id] = r["payload"]["mid"]
     @@playerDB[pNm][:Artwork] = r["payload"]["image_uri"] || r["payload"]["image_url"]
     @@playerDB[pNm][:Sid] = r["payload"]["sid"]
@@ -446,7 +451,7 @@ def Status(pNm,mId,params)
     }
   return body
   rescue
-    puts $!, $@
+     puts $!, $@
 end
 
 
@@ -454,19 +459,19 @@ def ContextMenu(pNm,mId,params)
   #puts "Context"
 puts "#{__method__} Debug: MID - #{mId} : Params - #{params}"
   case params["cmd"]
-  when "container", "album", "artist", "song"
+  when "queue_jump"#player/play_queue?pid=2&qid=9 player/remove_from_queue?pid=1&qid=4
+    b = [{:id=>"browse/play_queue?pid=#{@@playerDB[pNm][:HeosId]}&qid=#{mId}",:cmd=>"cmd:queue",:text=>"Play Now"},
+         {:id=>"browse/remove_from_queue?pid=#{@@playerDB[pNm][:HeosId]}&qid=#{mId}",:cmd=>"cmd:queue",:text=>"Remove from Queue"}]
+  when "station"
+     b = [{:id=>"browse/browse/play_stream?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}",:cmd=>"cmd:queue",:text=>"Play Now"}]
+  when "heos_login"
+     b = [{:id=>mId,:cmd=>"cmd:remove_account",:text=>"Remove Account"}]
+  else #"container", "album", "artist", "genre", "song", "playlist"
     b = [{:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=1",:cmd=>"cmd:queue",:text=>"Play Now"},
          {:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=2",:cmd=>"cmd:queue",:text=>"Play Next"},
          {:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=3",:cmd=>"cmd:queue",:text=>"Add To Queue"},
          {:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=4",:cmd=>"cmd:queue",:text=>"Replace Queue"}]
   #puts b
-  when "queue_jump"#player/play_queue?pid=2&qid=9 player/remove_from_queue?pid=1&qid=4
-    b = [{:id=>"browse/play_queue?pid=#{@@playerDB[pNm][:HeosId]}&qid=#{mId}",:cmd=>"cmd:queue",:text=>"Play Now"},
-         {:id=>"browse/remove_from_queue?pid=#{@@playerDB[pNm][:HeosId]}&qid=#{mId}",:cmd=>"cmd:queue",:text=>"Remove from Queue"}]
-   when "station"
-     b = [{:id=>"browse/browse/play_stream?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}",:cmd=>"cmd:queue",:text=>"Play Now"}]
-   when "heos_login"
-     b = [{:id=>mId,:cmd=>"cmd:remove_account",:text=>"Remove Account"}]
   end
   return b
 end
@@ -516,7 +521,7 @@ def NowPlaying(pNm,mId,params)
   #puts b
   return b
   rescue
-    puts $!, $@
+     puts $!, $@
 end
 
 def AutoStart(pNm,mId,params)
@@ -660,7 +665,7 @@ end
 
 def heos_service(pNm,mId,params)
   m = StandardBrowse(mId)
-  puts m
+  #puts m
   return m
 end
 
@@ -697,7 +702,7 @@ def search_service(pNm,mId,params)
 end
 
 def OLDsearch_service(pNm,mId,params)
-  puts "#{__method__}: #{mId}\n#{params}"
+  #puts "#{__method__}: #{mId}\n#{params}"
   #
   ##puts r
   b = []
@@ -761,7 +766,7 @@ def genre(pNm,mId,params)
 end
 
 def station(pNm,mId,params)
-  puts "#{__method__}: #{mId}\n#{params}"
+  #puts "#{__method__}: #{mId}\n#{params}"
   if mId.include?("inputs")
     SendToPlayer("browse/play_input?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}")
   else
@@ -771,7 +776,7 @@ def station(pNm,mId,params)
 end
 
 def station_favorite(pNm,mId,params)
-  puts "#{__method__}: #{mId}\n#{params}"
+  #puts "#{__method__}: #{mId}\n#{params}"
   SendToPlayer("browse/set_service_option?option=19&pid=#{@@playerDB[pNm][:HeosId]}")
   return {}
 end
@@ -781,13 +786,13 @@ def song(pNm,mId,params)
   #sid=3&mid=http://opml.radiotime.com/Tune.ashx?id%3Dt102382338&sid%3Dp644440&formats%3Daac,mp3,wma&partnerId%3DyYVQhZ!D&serial%3D00:05:cd:48:07:dc
   #          http://opml.radiotime.com/Tune.ashx?id%3Dt41378256%26sid%3Dp393605%26formats%3Daac,mp3,wma%26partnerId%3DyYVQhZ!D%26serial%3D00:05:cd:48:07:dc
   #sid=3&mid=http://opml.radiotime.com/Tune.ashx?id%3Dt41378256%26sid%3Dp393605%26formats%3Daac,mp3,wma%26partnerId%3DyYVQhZ!D%26serial%3D00:05:cd:48:07:dc
-  puts "#{__method__}: #{mId}\n#{params}"
+  #puts "#{__method__}: #{mId}\n#{params}"
   SendToPlayer("browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=1")
   return {}
 end
 
 def queue(pNm,mId,params)
-  puts "#{__method__}: #{mId}\n#{params}"
+  #puts "#{__method__}: #{mId}\n#{params}"
   SendToPlayer(mId)
   return {}
 end
@@ -819,7 +824,7 @@ def heos_account(pNm,mId,params)
 end
 
 def remove_account(pNm,mId,params)
-  puts "#{__method__}: #{mId}\n#{params}"
+  #puts "#{__method__}: #{mId}\n#{params}"
   @@userDB.delete(mId)
   r = SendToPlayer("system/check_account")
   m = r["heos"]["message"].split("=")[1]
@@ -832,7 +837,7 @@ def remove_account(pNm,mId,params)
 end
 
 def heos_login(pNm,mId,params)
-  puts "#{__method__}: #{mId}\n#{params}"
+  #puts "#{__method__}: #{mId}\n#{params}"
   r = Login(mId,@@userDB[mId])
   if r
     @@userDB[:current] = mId
@@ -844,13 +849,13 @@ def heos_login(pNm,mId,params)
 end
 
 def add_account(pNm,mId,params)
-  puts "#{__method__}: #{mId}\n#{params}"
+  #puts "#{__method__}: #{mId}\n#{params}"
   @@currentUser = params["search"]
   return [{:id=>"get_pass",:cmd=>"get_pass",:text=>"Password",:iInput=>true}]
 end
 
 def get_pass(pNm,mId,params)
-  puts "#{__method__}: #{mId}\n#{params}"
+  #puts "#{__method__}: #{mId}\n#{params}"
   r = Login(@@currentUser,params["search"])
   if r
     @@userDB[@@currentUser] = params["search"]
