@@ -43,7 +43,7 @@ def GetServerAddress
   udp.close
   @@sock = TCPSocket.open(@@heosServerAddress,1255)
   
-  #puts "Heos Server: #{@@heosServerAddress}"
+  puts "Heos Server: #{@@heosServerAddress}"
   @@sock.puts("heos://system/register_for_change_events?enable=off")
   sleep(0.5)
   if @@userDB[:current] && @@userDB[@@userDB[:current]]
@@ -55,7 +55,7 @@ def GetServerAddress
   @@sock.puts("heos://system/register_for_change_events?enable=on")
 rescue
    puts $!, $@
-  #puts "Could Not Connect to Server. Retrying"
+  puts "Could Not Connect to Server. Retrying"
   sleep(1)
   retry
 end
@@ -84,7 +84,7 @@ def MaintainSocket
           end
           #puts @@playerDB
         elsif r.include?('"command": "event/')
-          #puts "Found Event: #{r}"
+          puts "Found Event: #{r}"
           r = JSON.parse(r)
           c = r["heos"]["command"]
           m = Hash[(r["heos"]["message"]||"").split("&").map{|v|v.split("=")}]
@@ -92,7 +92,7 @@ def MaintainSocket
           c = c.split("/")[1]
           send(c,m)
         else
-          #puts "Received From Heos: #{r}"
+          puts "Received From Heos: #{r}"
           @@recBuffer << r
         end
       rescue
