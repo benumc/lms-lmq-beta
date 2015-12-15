@@ -521,7 +521,7 @@ def SavantRequest(req)
     begin
       rep = Object.const_get(pNm).SavantRequest(hostname,cmd,req) unless body
     rescue 
-      #puts $!, $@
+      puts $!, $@
       #abort
     end
     body = CreateMenu(hostname,rep) unless rep.nil?
@@ -531,6 +531,7 @@ def SavantRequest(req)
 end
 
 def ConnThread(local)
+  sTime = Time.now
   head,msg = ReadFromSavant(local)
   #puts "Head: #{head},Message: #{msg}"
   #puts "Savant Request:\n#{head}\n#{msg}\n\n"
@@ -560,8 +561,8 @@ def ConnThread(local)
       local.write(reply)
       local.close
     rescue 
-      #puts $!, $@
-      #puts "Reply failed. Savant Closed Socket. Continuing..."
+      puts $!, $@
+      puts "Reply failed. Savant Closed Socket. Continuing..."
     end
   else #savant could be asking for artwork, try and facilitate...
     r = ""
@@ -617,11 +618,13 @@ def ConnThread(local)
       end
     end
     begin
+      eTime = Time.now - sTime
       local.write(r)
       local.close
     rescue
-      #puts $!, $@
-      #puts "Write failed. Savant Closed Socket. Continuing..."
+      puts $!, $@
+      puts "Attempted to write: #{r}. Response took: #{eTime}"
+      puts "Write failed. Savant Closed Socket. Continuing..."
     end
   end    
 end

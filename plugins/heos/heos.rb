@@ -20,12 +20,13 @@ module Heos
 @@server = false
 @@sock = false
 @@currentUser = ""
+@@signInCount = 0
 
 @@setDir = Dir.home+"/.lmslmq/plugins/heos"
 FileUtils.mkdir_p(File.dirname(@@setDir+"/acc"))
 
 @@userDB = File.open(@@setDir+"/acc", "rb") {|f| Marshal.load(f)} if File.exist?(@@setDir+"/acc")
-
+puts @@userDB.inspect
 def SaveToFile(fl,hsh)
   File.open(@@setDir+fl, "wb") {|f| Marshal.dump(hsh, f)}
 end
@@ -47,11 +48,12 @@ def GetServerAddress
   @@sock.puts("heos://system/register_for_change_events?enable=off")
   sleep(0.5)
   if @@userDB[:current] && @@userDB[@@userDB[:current]]
+    puts "Attempting to sign-in to: #{@@userDB[:current]}"
     @@sock.puts("heos://system/sign_in?un=#{@@userDB[:current]}&pw=#{@@userDB[@@userDB[:current]]}")
   end
   sleep(0.5)
   @@sock.puts("heos://players/get_players")
-  sleep(0.5)
+  sleep(2)
   @@sock.puts("heos://system/register_for_change_events?enable=on")
 rescue
    puts $!, $@
@@ -82,9 +84,23 @@ def MaintainSocket
             n = p["name"].downcase
             @@playerDB[n] = {:HeosId => p["pid"]}
           end
-          #puts @@playerDB
+          puts @@playerDB
+        elsif r.include?('"system/sign_in", "result": "fail"')
+          @@signInCount = @@signInCount + 1
+          if @@signInCount > 5
+            @@userDB[:current] = nil
+            SaveToFile("/acc",@@userDB)
+            @@signInCount=0
+          else
+            sleep(1)
+            puts "Sign-In Failed... #{5 - @@signInCount} retries remaining"
+            @@sock.puts("heos://system/sign_in?un=#{@@userDB[:current]}&pw=#{@@userDB[@@userDB[:current]]}")
+          end
+        elsif r.include?('User not logged in')
+          @@userDB[:current] = nil
+          SaveToFile("/acc",@@userDB)
         elsif r.include?('"command": "event/')
-          puts "Found Event: #{r}"
+          #puts "Found Event: #{r}"
           r = JSON.parse(r)
           c = r["heos"]["command"]
           m = Hash[(r["heos"]["message"]||"").split("&").map{|v|v.split("=")}]
@@ -92,11 +108,11 @@ def MaintainSocket
           c = c.split("/")[1]
           send(c,m)
         else
-          puts "Received From Heos: #{r}"
+          #puts "Received From Heos: #{r}"
           @@recBuffer << r
         end
       rescue
-         puts $!, $@
+        #puts $!, $@
         GetServerAddress()
         retry
       end
@@ -119,6 +135,7 @@ def SendToPlayer(msg)
       r = JSON.parse(@@recBuffer[i])
       #puts "Match Found #{i}: #{r}"
       @@recBuffer.delete_at(i)
+      @@recBuffer.delete_at(0) if @@recBuffer.length > 20
       return r
       break
     #elsif 
@@ -314,9 +331,11 @@ def SavantRequest(hostname,cmd,req)
   
   
   #puts "Sending Command: #{cmd}"
-  
-  h["id"] = Base64.decode64(h["id"]) if h["id"] && h["id"].match(/^([A-Za-z0-9+\/]{4})*([A-Za-z0-9+\/]{4}|[A-Za-z0-9+\/]{3}=|[A-Za-z0-9+\/]{2}==)$/)
-  r = send(cmd,hostname["name"],h["id"],h)
+  r = {}
+  if h && hostname["name"]
+    h["id"] = Base64.decode64(h["id"]) if h["id"] && h["id"].match(/^([A-Za-z0-9+\/]{4})*([A-Za-z0-9+\/]{4}|[A-Za-z0-9+\/]{3}=|[A-Za-z0-9+\/]{2}==)$/)
+    r = send(cmd,hostname["name"],h["id"],h)
+  end
   #puts "Returning: #{r}" unless cmd == "Status"
   return r
 rescue
@@ -326,7 +345,7 @@ rescue
 end
 
 def TopMenu(pNm,mId,params)
-  #puts "#{__method__}: #{mId}\n#{params}"
+  puts "#{__method__}: #{mId}\n#{params}"
   return [{:id => 'heos_account',:cmd => 'heos_account',:text => 'Heos Account',:icon => 'plugins/heos/icons/heos+account'}] if @@userDB[:current].to_s == ""
   r = SendToPlayer("browse/get_music_sources")
   #puts r
@@ -367,6 +386,8 @@ def TopMenu(pNm,mId,params)
   }
   
   return b
+rescue
+  puts $!, $@
 end
 
 def Status(pNm,mId,params)
@@ -932,7 +953,7 @@ end
 #Unsolicited messaged below
 
 def sources_changed(msg)
-puts "#{__method__} Not Implemented: #{msg}"
+#puts "#{__method__} Not Implemented: #{msg}"
 end
 
 def players_changed(msg)
@@ -940,7 +961,7 @@ puts "#{__method__} Not Implemented: #{msg}"
 end
 
 def groups_changed(msg)
-puts "#{__method__} Not Implemented: #{msg}"
+#puts "#{__method__} Not Implemented: #{msg}"
 end
 
 def source_data_changed(msg)
@@ -1031,7 +1052,8 @@ puts "#{__method__} Not Implemented: #{msg}"
 end
 
 def user_changed(msg)
-puts "#{__method__} Not Implemented: #{msg}"
+#puts "#{__method__} Not Implemented: #{msg}"
+@@userDB[:current] = msg["un"] if msg["signed_in"] && msg["un"]
 end
 
 MaintainSocket()
