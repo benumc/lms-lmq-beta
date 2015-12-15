@@ -46,6 +46,8 @@ end
 
 def GetPlugins()
   Dir["#{ File.expand_path(File.dirname(__FILE__))}/plugins/**/*.rb"].each { |f| require(f) }
+rescue
+  puts $!, $@
 end
 
 def ReadFromSavant(local)

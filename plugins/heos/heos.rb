@@ -56,7 +56,7 @@ def GetServerAddress
   sleep(2)
   @@sock.puts("heos://system/register_for_change_events?enable=on")
 rescue
-   puts $!, $@
+  puts $!, $@
   puts "Could Not Connect to Server. Retrying"
   sleep(1)
   retry
