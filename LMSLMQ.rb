@@ -557,7 +557,7 @@ def GetArtwork(request)
     file = Tempfile.new('lmq')
     file.write open(request).read
     file.close
-    `convert #{file.path} -background none -resize 500x500 -gravity center -extent 500x500 #{file.path}` rescue
+    #`convert #{file.path} -background none -resize 500x500 -gravity center -extent 500x500 #{file.path}` rescue
     content = File.open(file.path,"rb").read
     file.unlink
     imgType = "jpg"
