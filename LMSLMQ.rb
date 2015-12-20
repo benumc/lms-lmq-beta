@@ -20,7 +20,8 @@ $menuBuffer = {}
 $imageCache = []
 $cachePath = "/tmp/lmslmq/"
 
-$localIP = "http://#{Socket.ip_address_list.detect{|i| !i.ip_address.include?("127.0.")}.ip_address}:9000/"
+$localIP = ""
+
 $localDirectory = File.expand_path(File.dirname(__FILE__))
 #"http://#{IPSocket.getaddress(Socket.gethostname)}:9000/"
 $uidHash = {}
@@ -204,7 +205,7 @@ def CreateTopMenu(hostname,menuArray)
         }
     end
   end  
- #puts JSON.pretty_generate(body)
+#puts JSON.pretty_generate(body)
   return body
 end
 
@@ -411,7 +412,7 @@ def SavantRequest(req)
     hstnm.scan(/([^:]+):([^,]+),?/).map {|x| hostname[x[0]]=x[1]}
     pNm = (hostname["plugin"]||"").capitalize
     unless pNm.to_s == ""
-      $uidHash[hostname["name"]] = hostname
+      $uidHash[hostname["name"].downcase] = hostname
       return EmptyBody()
     else
       return EmptyBody()
@@ -532,12 +533,55 @@ def SavantRequest(req)
   return body
 end
 
+def GetArtwork(request)
+  content = ""
+  response = ""
+  imgType = ""
+  request = request[/GET ([^ ]+) HTTP\/1\.0?1?/,1].sub("/"+$localIP,"")
+  
+  artLookup = request[/music\/([^\/]+?)\/cover\.jpg/,1]
+  request = $artLookup[artLookup] if $artLookup[artLookup]
+  
+  pluginIcon = request[/(plugins\/[^\/]+\/icons\/.+)/,1]
+  
+  if pluginIcon
+    if File.file?($localDirectory+URI.decode(request)+".jpg")
+      imgType = "jpg"
+      content = File.open($localDirectory+URI.decode(request)+".jpg","rb").read
+    elsif File.file?($localDirectory+URI.decode(request)+".png")
+      imgType = "png"
+      content = File.open($localDirectory+URI.decode(request)+".jpg","rb").read      
+    end
+  else
+    if File.file?(request)
+      file = Tempfile.new('lmq')
+      file.write open(request).read
+      file.close
+      `convert #{file.path} -background none -resize 500x500 -gravity center -extent #{size} #{file.path}`
+      response = File.open(file.path,"rb").read
+      file.unlink
+      imgType = "jpg"
+    end
+  end
+  if imgType == ""
+    response = $NotFound
+  else
+    response = "HTTP/1.1 200 OK\r\nContent-Type: image/#{imgType}\r\nContent-Length: #{content.length}\r\n\r\n#{content}"
+  end
+  return response
+rescue
+  puts $!, $@
+end
+
 def ConnThread(local)
-  sTime = Time.now
   head,msg = ReadFromSavant(local)
   #puts "Head: #{head},Message: #{msg}"
   #puts "Savant Request:\n#{head}\n#{msg}\n\n"
   if msg && msg.length > 4 && head.include?("json")
+    if $localIP == "" 
+      $localIP = "http://#{head[/Host: ([^\r\n]+)/,1]}/"
+      puts "Local IP address: #{$localIP}"
+    end
     begin
       req = JSON.parse(msg)
     rescue
@@ -555,7 +599,7 @@ def ConnThread(local)
     when Hash
       body = SavantRequest(req)
     else
-     #puts "Unexpected result: #{req}"
+     puts "Unexpected result: #{req}"
     end
      #puts "Reply#{body}"
      reply = GetSavantReply(body)
@@ -567,68 +611,18 @@ def ConnThread(local)
       puts "Reply failed. Savant Closed Socket. Continuing..."
     end
   else #savant could be asking for artwork, try and facilitate...
-    r = ""
     #puts "Savant Request:\n#{head}\n#{msg}\n\n"
-    if head
-      #start by looking for plugin icons
-      url = head[/GET (\/plugins\/[^\/]+\/icons\/[^ HTTP]+) HTTP\/1\.1/,1]
-      if url
-        #puts url
-        f = $localDirectory+URI.decode(url)+".jpg"
-        f = $localDirectory+URI.decode(url)+".png" unless File.file?(f)
-        if File.file?(f)
-          b = File.open(f,"rb").read
-          r = "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: #{b.length}\r\n\r\n#{b}"
-        end
-      end
-      if r == ""
-        begin
-          #puts "Savant Request:\n#{head}"
-          url ||= head[/GET (?:(?:http:\/\/)(?:[0-9]{1,3}\.){3}[0-9]{1,3})\/([^ ]+) HTTP\/1.1/,1]
-          url ||= head[/GET \/(http[^ ]+) HTTP\/1.1/,1]
-          if url
-            size = "100x100"
-          else
-            
-            lookup = head[/GET (?:(?:http:\/\/)(?:[0-9]{1,3}\.){3}[0-9]{1,3})?(?:\/music)?\/([^ ]+?)(?:\/cover\.jpg)? HTTP\/1\.0?1?/,1]
-            url = $artLookup[lookup]
-            size = "500x500"
-          end
-          unless url.to_s == ''
-            #puts url.inspect
-            #res = Net::HTTP.get_response(URI(url))
-            #url = res["Location"] if res["Location"]
-            
-            file = Tempfile.new('lmq')
-            #file.write open(url,:allow_redirections => :all).read
-            file.write open(url).read
-            #puts file.path
-            file.close
-            `convert #{file.path} -background none -resize #{size} -gravity center -extent #{size} #{file.path}`
-            b = File.open(file.path,"rb").read
-            raise "Image Error" unless b.length > 1
-            file.unlink
-            #puts b.inspect
-            r = "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: #{b.length}\r\n\r\n#{b}"
-          end
-        rescue
-          #puts $!, $@
-          r = $NotFound
-          #b = File.open('img.png',"rb").read
-          #r = "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: #{b.length}\r\n\r\n#{b}"
-        end
-      end
-    end
+    r = GetArtwork(head)
     begin
-      eTime = Time.now - sTime
+      #puts "Responese: #{r.inspect}"
       local.write(r)
       local.close
     rescue
       puts $!, $@
-      puts "Attempted to write: #{r}. Response took: #{eTime}"
+      puts "Attempted to write: #{r}."
       puts "Write failed. Savant Closed Socket. Continuing..."
     end
-  end    
+  end
 end
 
 Thread.abort_on_exception = true #set false to increase longevity 

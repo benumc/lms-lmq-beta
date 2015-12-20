@@ -50,10 +50,13 @@ def GetServerAddress
   if @@userDB[:current] && @@userDB[@@userDB[:current]]
     puts "Attempting to sign-in to: #{@@userDB[:current]}"
     @@sock.puts("heos://system/sign_in?un=#{@@userDB[:current]}&pw=#{@@userDB[@@userDB[:current]]}")
+  else
+    puts "No User records found... Continuing"
   end
   sleep(0.5)
   @@sock.puts("heos://players/get_players")
   sleep(2)
+  puts "Registering For Change Events"
   @@sock.puts("heos://system/register_for_change_events?enable=on")
 rescue
   puts $!, $@
@@ -91,6 +94,7 @@ def MaintainSocket
             @@userDB[:current] = nil
             SaveToFile("/acc",@@userDB)
             @@signInCount=0
+            @@recBuffer << r
           else
             sleep(1)
             puts "Sign-In Failed... #{5 - @@signInCount} retries remaining"
@@ -157,10 +161,10 @@ rescue
 end
 
 def Login(un,pw)
-  #puts "#{__method__}. un:#{un}. pw:#{pw}"
+  puts "#{__method__}. un:#{un}. pw:#{pw}"
   loop do
     r = SendToPlayer("system/sign_in?un=#{un}&pw=#{pw}")
-    #puts "Login Status: #{r}"
+    puts "Login Status: #{r}"
     if r["heos"]["result"]=="success"
       return true
     else
@@ -174,6 +178,9 @@ def Login(un,pw)
   #  r = SendToPlayer("system/check_account")
   #end
   #return true
+rescue
+  puts $!, $@
+  sleep(1)
 end
 
   #Server Command Handling Below
@@ -345,7 +352,7 @@ rescue
 end
 
 def TopMenu(pNm,mId,params)
-  puts "#{__method__}: #{mId}\n#{params}"
+  #puts "#{__method__}: #{mId}\n#{params}"
   return [{:id => 'heos_account',:cmd => 'heos_account',:text => 'Heos Account',:icon => 'plugins/heos/icons/heos+account'}] if @@userDB[:current].to_s == ""
   r = SendToPlayer("browse/get_music_sources")
   #puts r
@@ -420,7 +427,7 @@ def Status(pNm,mId,params)
     r = SendToPlayer("browse/retrieve_metadata?sid=#{@@playerDB[pNm][:Sid]}&cid=#{@@playerDB[pNm][:Alb]}")
     @@playerDB[pNm][:Artwork] = r["payload"][0]["images"][-1]["image_url"] rescue ""
   end
-   @@playerDB[pNm][:Artwork] = "/plugins/heos/icons/default" if @@playerDB[pNm][:Artwork].to_s == ''
+   @@playerDB[pNm][:Artwork] = "plugins/heos/icons/default" if @@playerDB[pNm][:Artwork].to_s == ''
    
   #puts @@playerDB[pNm][:Volume]
   unless @@playerDB[pNm][:Volume]
@@ -876,7 +883,7 @@ def add_account(pNm,mId,params)
 end
 
 def get_pass(pNm,mId,params)
-  #puts "#{__method__}: #{mId}\n#{params}"
+  puts "#{__method__}: #{mId}\n#{params}"
   r = Login(@@currentUser,params["search"])
   if r
     @@userDB[@@currentUser] = params["search"]
