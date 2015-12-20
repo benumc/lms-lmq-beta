@@ -341,7 +341,7 @@ def SavantRequest(hostname,cmd,req)
   r = {}
   if h && hostname["name"]
     h["id"] = Base64.decode64(h["id"]) if h["id"] && h["id"].match(/^([A-Za-z0-9+\/]{4})*([A-Za-z0-9+\/]{4}|[A-Za-z0-9+\/]{3}=|[A-Za-z0-9+\/]{2}==)$/)
-    r = send(cmd,hostname["name"],h["id"],h)
+    r = send(cmd,hostname["name"].downcase,h["id"],h)
   end
   #puts "Returning: #{r}" unless cmd == "Status"
   return r
@@ -794,7 +794,7 @@ def genre(pNm,mId,params)
 end
 
 def station(pNm,mId,params)
-  #puts "#{__method__}: #{mId}\n#{params}"
+  puts "#{__method__}: #{mId}\n#{params}"
   if mId.include?("inputs")
     SendToPlayer("browse/play_input?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}")
   else

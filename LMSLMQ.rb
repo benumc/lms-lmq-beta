@@ -537,7 +537,7 @@ def GetArtwork(request)
   content = ""
   response = ""
   imgType = ""
-  request = request[/GET ([^ ]+) HTTP\/1\.0?1?/,1].sub("/"+$localIP,"")
+  request = request[/GET \/([^ ]+) HTTP\/1\.0?1?/,1].sub("/"+$localIP,"")
   
   artLookup = request[/music\/([^\/]+?)\/cover\.jpg/,1]
   request = $artLookup[artLookup] if $artLookup[artLookup]
@@ -545,23 +545,22 @@ def GetArtwork(request)
   pluginIcon = request[/(plugins\/[^\/]+\/icons\/.+)/,1]
   
   if pluginIcon
-    if File.file?($localDirectory+URI.decode(request)+".jpg")
+    f = $localDirectory+"/"+URI.decode(request)
+    if File.file?(f+".jpg")
       imgType = "jpg"
-      content = File.open($localDirectory+URI.decode(request)+".jpg","rb").read
-    elsif File.file?($localDirectory+URI.decode(request)+".png")
+      content = File.open(f+".jpg","rb").read
+    elsif File.file?(f+".png")
       imgType = "png"
-      content = File.open($localDirectory+URI.decode(request)+".jpg","rb").read      
+      content = File.open(f+".png","rb").read      
     end
   else
-    if File.file?(request)
-      file = Tempfile.new('lmq')
-      file.write open(request).read
-      file.close
-      `convert #{file.path} -background none -resize 500x500 -gravity center -extent #{size} #{file.path}`
-      response = File.open(file.path,"rb").read
-      file.unlink
-      imgType = "jpg"
-    end
+    file = Tempfile.new('lmq')
+    file.write open(request).read
+    file.close
+    `convert #{file.path} -background none -resize 500x500 -gravity center -extent 500x500 #{file.path}`
+    content = File.open(file.path,"rb").read
+    file.unlink
+    imgType = "jpg"
   end
   if imgType == ""
     response = $NotFound
