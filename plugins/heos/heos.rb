@@ -26,7 +26,7 @@ module Heos
 FileUtils.mkdir_p(File.dirname(@@setDir+"/acc"))
 
 @@userDB = File.open(@@setDir+"/acc", "rb") {|f| Marshal.load(f)} if File.exist?(@@setDir+"/acc")
-puts @@userDB.inspect
+#puts @@userDB.inspect
 def SaveToFile(fl,hsh)
   File.open(@@setDir+fl, "wb") {|f| Marshal.dump(hsh, f)}
 end
@@ -206,6 +206,11 @@ def ParseMenu(msg,mId)
   b = []
   if r
     m = Hash[r["heos"]["message"].split("&").map {|e|e.split("=")}]
+    if r["options"].to_s.include?("create new station")#browse/set_service_option?sid=1&option=13&scid=1&name=
+      b << {:cmd=>"create_station",:id=>"browse/set_service_option?sid=#{m["sid"]}&id=13&scid=1",:text=>"Create Artist Station",:iInput=>true}
+      b << {:cmd=>"create_station",:id=>"browse/set_service_option?sid=#{m["sid"]}&id=13&scid=5",:text=>"Create Show Station",:iInput=>true}
+      b << {:cmd=>"create_station",:id=>"browse/set_service_option?sid=#{m["sid"]}&id=13&scid=3",:text=>"Create Track Station",:iInput=>true}
+    end
     r["payload"].each do |s|
       #puts s.inspect
       name = URI.decode(s["name"]).encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})
@@ -346,8 +351,9 @@ def SavantRequest(hostname,cmd,req)
   #puts "Returning: #{r}" unless cmd == "Status"
   return r
 rescue
-  
-     puts $!, $@
+  puts $!, $@
+  puts "Hostname:\n#{hostname}\n\nCommand:\n#{cmd}\n\nRequest:\n#{req}" unless cmd == "Status"
+  puts "PlayerDB: #{@@playerDB.inspect}"
   return nil
 end
 
@@ -709,6 +715,10 @@ def music_service(pNm,mId,params)
   return menu
 end
 
+def service_option(pNm,mId,params)
+  ParseMenu(mId)
+end
+
 def search_menu(pNm,mId,params)
   r = SendToPlayer(mId)
   menu = []
@@ -773,6 +783,11 @@ end
 
 def heos_server(pNm,mId,params)
   return StandardBrowse(mId)
+end
+
+def create_station(pNm,mId,params)
+  puts "#{__method__}: #{mId}\n#{params}"
+  return ParseMenu("#{mId}&name=#{params["search"]}",mId)
 end
 
 def container(pNm,mId,params)
@@ -899,15 +914,34 @@ def manage_playing(pNm,mId,params)
   #"player/get_queue?pid=1&range=0,10"
   
   r = SendToPlayer("player/get_now_playing_media?pid=#{@@playerDB[pNm][:HeosId]}")
-  #puts r
+  puts r
   b = []
   if r && r["payload"]["type"] == "station"
+    o =  r["options"].to_s
+    if o.include?("Add to HEOS Favorites")
       h = {}
       h[:id] = "player/get_now_playing_media?pid=#{@@playerDB[pNm][:HeosId]}&id=19"
       h[:cmd] = "station_favorite"
       h[:text] = "Add #{r["payload"]["station"]} to Favorites"
       h[:icon] = r["payload"]["image_url"]
       b << h
+    end
+    if o.include?("Thumbs Up")
+      h = {}
+      h[:id] = "browse/set_service_option?pid=#{@@playerDB[pNm][:HeosId]}&sid=#{r["payload"]["sid"]}&option=11"
+      h[:cmd] = "service_option"
+      h[:text] = "Thumbs Up: #{r["payload"]["station"]}"
+      h[:icon] = "plugins/heos/icons/thumbs+up"
+      b << h
+    end
+    if o.include?("Thumbs Down")
+      h = {}
+      h[:id] = "browse/set_service_option?pid=#{@@playerDB[pNm][:HeosId]}&sid=#{r["payload"]["sid"]}&option=12"
+      h[:cmd] = "service_option"
+      h[:text] = "Thumbs Down: #{r["payload"]["station"]}"
+      h[:icon] = "plugins/heos/icons/thumbs+down"
+      b << h
+    end
   else
     r = SendToPlayer("player/get_queue?pid=#{@@playerDB[pNm][:HeosId]}")
     #puts r

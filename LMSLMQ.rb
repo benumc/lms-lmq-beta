@@ -539,8 +539,8 @@ def GetArtwork(request)
   imgType = ""
   request = request[/GET \/([^ ]+) HTTP\/1\.0?1?/,1].sub("/"+$localIP,"")
   
-  artLookup = request[/music\/([^\/]+?)\/cover\.jpg/,1]
-  request = $artLookup[artLookup] if $artLookup[artLookup]
+  request = request[/music\/([^\/]+?)\/cover\.jpg/,1] || request
+  request = $artLookup[request] if $artLookup[request]
   
   pluginIcon = request[/(plugins\/[^\/]+\/icons\/.+)/,1]
   
@@ -553,11 +553,11 @@ def GetArtwork(request)
       imgType = "png"
       content = File.open(f+".png","rb").read      
     end
-  else
+  elsif request.include?("http")
+    
     file = Tempfile.new('lmq')
     file.write open(request).read
     file.close
-    #`convert #{file.path} -background none -resize 500x500 -gravity center -extent 500x500 #{file.path}` rescue
     content = File.open(file.path,"rb").read
     file.unlink
     imgType = "jpg"
