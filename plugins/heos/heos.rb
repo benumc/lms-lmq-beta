@@ -497,7 +497,7 @@ puts "#{__method__} Debug: MID - #{mId} : Params - #{params}"
     b = [{:id=>"browse/play_queue?pid=#{@@playerDB[pNm][:HeosId]}&qid=#{mId}",:cmd=>"cmd:queue",:text=>"Play Now"},
          {:id=>"browse/remove_from_queue?pid=#{@@playerDB[pNm][:HeosId]}&qid=#{mId}",:cmd=>"cmd:queue",:text=>"Remove from Queue"}]
   when "station"
-     b = [{:id=>"browse/browse/play_stream?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}",:cmd=>"cmd:queue",:text=>"Play Now"}]
+     b = [{:id=>"browse/play_stream?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}",:cmd=>"cmd:queue",:text=>"Play Now"}]
   when "heos_login"
      b = [{:id=>mId,:cmd=>"cmd:remove_account",:text=>"Remove Account"}]
   else #"container", "album", "artist", "genre", "song", "playlist"
