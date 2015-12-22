@@ -47,5 +47,8 @@ fi
 nohup ruby lms-lmq-beta-master/LMSLMQ.rb >/dev/null 2>&1 &
 fi
 ```
+
+Here are a couple of screenshots.
+
 ![alt tag](https://raw.github.com/benumc/lms-lmq-beta/master/screen1.png)
 ![alt tag](https://raw.github.com/benumc/lms-lmq-beta/master/screen2.png)
