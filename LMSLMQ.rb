@@ -11,6 +11,9 @@ require 'json'
 require 'tempfile'
 require 'base64'
 
+$SqueezeboxServerIP = "192.168.1.40"
+$SqueezeboxServerPort = 9000
+
 $Head = "HTTP/1.1 200 OK\r\nServer: Logitech Media Server\r\nContent-Length: 0\r\nContent-Type: application/json"
 $NotFound = "HTTP/1.1 404 Not Found\r\n\r\n"
 
@@ -72,6 +75,8 @@ def GetSavantReply(body)
   #puts "LMS Reply:\n#{body}\n\n"
   head = $Head.sub(/Content-Length: \d+/,"Content-Length: #{body.length}")
   return "#{head}\r\n\r\n#{body}"
+rescue 
+  return body
 end
 
 def EmptyBody
@@ -303,7 +308,7 @@ def CreateContextMenu(hostname,menuArray)
 end
 
 def CreateNowPlaying(hostname,menuArray)
-  puts "Create Now Playing:"
+  #puts "Create Now Playing:"
   #puts hostname
   #puts JSON.generate(menuArray)
   body = {
@@ -312,15 +317,41 @@ def CreateNowPlaying(hostname,menuArray)
   "result"=>{"item_loop"=>[]}}
   return body unless menuArray
     menuArray.each do |i|
-      a = i[:args]||""
-      body["result"]["item_loop"][body["result"]["item_loop"].length] = {
-        "actions"=>{"go"=>{
-          "params"=>{:id=>i[:id],:args=>a},"cmd"=>[i[:cmd]]
-        }},
-        "text"=>i[:text]
+      if i[:iInput]
+        h = {
+          "actions"=>{
+            "do"=>{
+              "itemsParams"=>"params",
+              "params"=>{
+                :search=>"__TAGGEDINPUT__"
+              },
+              "cmd"=>["cmd:#{i[:cmd]}","id:#{i[:id]}"]
+            }
+          },
+          "input"=>{"len"=>1},
+          :text=>i[:text]
         }
+        h["icon-id"]=i[:icon] if i[:icon]
+      else
+        a = i[:args]||""
+        h = {
+          "params"=>{
+            "track_id"=>i[:id],
+            "playlist_index"=>i[:id]
+          },
+          "actions"=>{
+            "do"=>{
+              "cmd"=>["cmd:#{i[:cmd]}","id:#{i[:id]}"]
+            }
+          },
+          :text=>i[:text]
+        }
+        h["icon-id"]=i[:icon] if i[:icon]
+        body["result"]["playlist_cur_index"]="#{i[:id]}" if i[:current]
+      end
+      body["result"]["item_loop"] << h
     end
-    puts JSON.generate(body)
+    #puts JSON.generate(body)
   return body
 end
 
@@ -400,14 +431,35 @@ def CreateStatus(hostname,statusHash)
   return body
 end
 
-def SavantRequest(req)
+def ServerPost(h,msg)
+    p = true unless msg.include?('"status","-","1"')
+    sock = TCPSocket.open($SqueezeboxServerIP,$SqueezeboxServerPort)
+    h.gsub!(/Content-Length: \d+/,"Content-Length: #{msg.length}")
+    
+    #puts "Savant Request:\n#{msg}\n\n" if p
+    
+    sock.write("#{h}\r\n\r\n#{msg}")
+    h = sock.gets("\r\n\r\n")
+    /Content-Length: ([^\r\n]+)\r\n/.match(h)
+    l = $1.to_i
+    r = ''
+    
+    while l > r.length
+        r << sock.read(l - r.length)
+    end
+    
+    #puts "Squeeze Response:\n#{r}\n\n" if p
+      
+    return "#{h}#{r}"
+end
+
+def SavantRequest(req,head,msg)
   hstnm = req["params"][0]
   hostname = {}
   #if $uidHash[hstnm]
   #  hostname = $uidHash[hstnm]
   #  pNm = (hostname["plugin"]||"").capitalize
   #else
-  #puts req
   if hstnm.include?("cmd:playerinfo")
     hstnm.scan(/([^:]+):([^,]+),?/).map {|x| hostname[x[0]]=x[1]}
     pNm = (hostname["plugin"]||"").capitalize
@@ -421,11 +473,17 @@ def SavantRequest(req)
     hostname = $uidHash[hstnm]
     pNm = (hostname["plugin"]||"").capitalize
   else
-    return EmptyBody()
+    #puts "Possibly need to forward to squeezebox server"
+    #puts req
+    msg.gsub!("999999999999999","1000") if head.include? "POST"
+    msg.gsub!("\"time\": \"\([^ ]*\)\",","\"time\": \1,")
+    r = ServerPost(head,msg)
+    return r
   end
   #end
   #puts "Hostname: #{hostname}"
   #LoadPlugin(pNm)
+  #puts req unless req["params"][1][0] == "status"
   req = req["params"][1]
   case 
   when req == ["version","?"] #fixed response not sure how much is needed
@@ -451,6 +509,9 @@ def SavantRequest(req)
     body = CreateNowPlaying(hostname,Object.const_get(pNm).SavantRequest(hostname,cmd,req))
   when req[0] == "playlist" && req[1] == "play"
     cmd = "AutoStart"
+  when req[0] == "playlist" && req[1] == "jump"
+    cmd = "PlaylistJump"
+    req[2] = "id:#{req[2]}"
   when req[0] == "time"
     req[1] = "time:#{req[1]}"
     cmd = "SkipToTime"
@@ -537,7 +598,9 @@ def GetArtwork(request)
   content = ""
   response = ""
   imgType = ""
-  request = request[/GET \/([^ ]+) HTTP\/1\.0?1?/,1].sub("/"+$localIP,"")
+  if request.match(/GET \/([^ ]+) HTTP\/1\.0?1?/)
+    request = $1.sub("/"+$localIP,"")
+  end
   
   request = request[/music\/([^\/]+?)\/cover\.jpg/,1] || request
   request = $artLookup[request] if $artLookup[request]
@@ -596,7 +659,7 @@ def ConnThread(local)
       body = MetaConnect(req[0]["channel"])
       #Netplayaudio.NetplayConnect(head,msg)
     when Hash
-      body = SavantRequest(req)
+      body = SavantRequest(req,head,msg)
     else
      puts "Unexpected result: #{req}"
     end

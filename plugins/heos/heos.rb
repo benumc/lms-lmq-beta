@@ -6,6 +6,7 @@ require 'open-uri'
 require 'cgi'
 require 'fileutils'
 require 'base64'
+require 'timeout'
 
 
 module Heos
@@ -21,6 +22,7 @@ module Heos
 @@sock = false
 @@currentUser = ""
 @@signInCount = 0
+@@NotFoundCount = 0
 
 @@setDir = Dir.home+"/.lmslmq/plugins/heos"
 FileUtils.mkdir_p(File.dirname(@@setDir+"/acc"))
@@ -33,17 +35,50 @@ end
 
 
 def GetServerAddress
+  puts "Locating Heos Player..."
   @@server = true
-  addr = ['239.255.255.250', 1900]# broadcast address
-  udp = UDPSocket.new
-  udp.setsockopt(Socket::SOL_SOCKET, Socket::SO_BROADCAST, true)
-  data = "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 1\r\nST: urn:schemas-denon-com:device:ACT-Denon:1\r\n"
-  udp.send(data, 0, addr[0], addr[1])
-  data,address = udp.recvfrom(1024)
-  @@heosServerAddress = address[2]
-  udp.close
-  @@sock = TCPSocket.open(@@heosServerAddress,1255)
-  
+  if @@userDB[:server]
+    begin
+      status = Timeout::timeout(1) {
+        @@heosServerAddress = @@userDB[:server]
+        @@sock = TCPSocket.open(@@heosServerAddress,1255)
+        puts "Connected to previous address #{@@heosServerAddress}"
+      }
+    rescue Timeout::Error
+      puts "Heos Not Found at previous address"
+      @@heosServerAddress = ""
+      @@sock = false
+      @@userDB.delete(:server)
+    end
+  end
+  unless @@sock
+    begin
+  #raise Timeout::Error
+      status = Timeout::timeout(1) {
+        addr = ['239.255.255.250', 1900]# broadcast address
+        udp = UDPSocket.new
+        udp.setsockopt(Socket::SOL_SOCKET, Socket::SO_BROADCAST, true)
+        data = "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 1\r\nST: urn:schemas-denon-com:device:ACT-Denon:1\r\n"
+        udp.send(data, 0, addr[0], addr[1])
+        data,address = udp.recvfrom(1024)
+        @@heosServerAddress = address[2]
+        udp.close
+        @@sock = TCPSocket.open(@@heosServerAddress,1255)
+      }
+    rescue Timeout::Error
+      @@NotFoundCount = @@NotFoundCount + 1
+      if @@NotFoundCount > 2
+        @@NotFoundCount = 0
+        puts "Heos Not Found"
+        return nil
+      else
+        puts "Retrying"
+        retry
+      end
+    end
+  end
+  @@userDB[:server] = @@heosServerAddress
+  SaveToFile("/acc",@@userDB)
   puts "Heos Server: #{@@heosServerAddress}"
   @@sock.puts("heos://system/register_for_change_events?enable=off")
   sleep(0.5)
@@ -67,6 +102,7 @@ end
 
 #Thread.abort_on_exception = true
 def MaintainSocket
+  
   th = Thread.new do
     #puts "Starting Socket"
     loop do
@@ -100,7 +136,11 @@ def MaintainSocket
             puts "Sign-In Failed... #{5 - @@signInCount} retries remaining"
             @@sock.puts("heos://system/sign_in?un=#{@@userDB[:current]}&pw=#{@@userDB[@@userDB[:current]]}")
           end
+        elsif r[/signed_in&un=([^"]+)"/]
+          puts "Sign-In to account: #{$1} - successful"
+          @@recBuffer << r
         elsif r.include?('User not logged in')
+          puts "Not Logged Into Heos"
           @@userDB[:current] = nil
           SaveToFile("/acc",@@userDB)
         elsif r.include?('"command": "event/')
@@ -122,6 +162,7 @@ def MaintainSocket
       end
     end
   end
+  #th.join
   rescue
     @@sock = nil
     @@server = nil
@@ -198,16 +239,17 @@ puts "#{__method__} Not Implemented: MID - #{mId} : Params - #{params}"
 end
 
 def ParseMenu(msg,mId)
-  #puts msg
+  puts msg
   r = SendToPlayer(msg)
-  #puts r.inspect
-  #puts r["heos"]
+  puts r.inspect
+  puts r["heos"]
   ids = {}
   b = []
   if r
     m = Hash[r["heos"]["message"].split("&").map {|e|e.split("=")}]
     if r["options"].to_s.include?("create new station")#browse/set_service_option?sid=1&option=13&scid=1&name=
       b << {:cmd=>"create_station",:id=>"browse/set_service_option?sid=#{m["sid"]}&id=13&scid=1",:text=>"Create Artist Station",:iInput=>true}
+#iheartradio only for below items according to cli protocol
       b << {:cmd=>"create_station",:id=>"browse/set_service_option?sid=#{m["sid"]}&id=13&scid=5",:text=>"Create Show Station",:iInput=>true}
       b << {:cmd=>"create_station",:id=>"browse/set_service_option?sid=#{m["sid"]}&id=13&scid=3",:text=>"Create Track Station",:iInput=>true}
     end
@@ -234,6 +276,8 @@ def ParseMenu(msg,mId)
         img = "" if img.include?("opml.radiotime.com")
         img = "plugins/heos/icons/default" if img.to_s == "" && mId == "sid=1028"
       end
+      name  = "#{name}\n#{Base64.strict_encode64(id)}" if msg.include?("sid=1028")
+      name  = "#{name}\n#{Base64.strict_encode64(id)}" if msg.include?("sid=1025")
       h = {}
       h[:id] = Base64.strict_encode64(id)
       h[:cmd] = s["type"]
@@ -272,74 +316,11 @@ def StandardBrowse(mId)
      puts $!, $@
 end
 
-def oldStandardBrowse(mId) #implement count / range   
-  #puts "Get Menu From Heos :\n#{mId}"
-  m = mId.split("&cid=")
-  #if m[1] && m[1].include?("http")
-  #  url = URI.decode(URI.decode(URI.decode(m[1])))
-  #  mId = "#{m[0]}&cid=#{CGI.escape(url)}"
-  #  rt = JSON.parse(open(url).read)["body"]
-  #  if rt
-  #    n = []
-  #    rt.each{|h| h["children"].each{|h1| n << h1} if h["children"]}
-  #    j = Hash[n.map{|e| [e["text"],e["image"]] }] 
-  #  end
-  #end
-  r = SendToPlayer("browse/browse?#{mId}")
-  #puts "Received Menu For Parsing :\n#{r}"
-  ids = {}
-  b = []
-  if r
-    r["payload"].each do |s|
-      s["name"] = URI.decode(s["name"])
-      next unless s["name"].length > 2
-      if s["sid"]
-        id = "sid=#{s["sid"]}"
-      elsif s["mid"]
-        id = "#{mId.split("&cid=")[0]}&mid=#{s["mid"]}"
-      else
-        #id = mId
-        id = "#{m[0]}&cid=#{s["cid"]}"
-      end
-      next if ids[id]
-      ids[id] = ""
-      #puts s
-      if mId == "sid=3" #override tunein main menu icons with local ones
-        img = "plugins/heos/icons/tunein_#{s["name"].downcase.gsub(" ","+")}"
-      else
-        img = s["image_url"] || s["image_uri"]
-        if s["image_url"] == "" && j
-          img = j[s["name"]] || img
-        end
-        if img.include?("opml.radiotime.com")
-          img = ""
-        end
-      end
-      name = s["name"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})
-      name = "Stations" if name == "STATIONS"
-      name = "Tracks" if name == "TRACKS"
-      if mId == "sid=1028"
-        name = name + "\n"+s["mid"] 
-        img = "plugins/heos/icons/default" if img.to_s == ""
-      end
-      h = {}
-      h[:id] = id
-      h[:cmd] = s["type"]
-      h[:text] = name
-      h[:icon] = img if img.length > 0
-      h[:iContext] = true if s["playable"] == "yes"
-      b << h
-    end
-  end
-  #puts "Heos Menu :\n#{b}"
-  return b
-end
-
 #Savant Request Handling Below********************
 
 def SavantRequest(hostname,cmd,req)
   #puts "Hostname:\n#{hostname}\n\nCommand:\n#{cmd}\n\nRequest:\n#{req}" unless cmd == "Status"
-  h = Hash[req.select { |e|  e.include?(":")  }.map {|e| e.split(":",2) if e && e.to_s.include?(":")}]
+  h = Hash[req.select { |e|  e.to_s.include?(":")  }.map {|e| e.split(":",2) if e && e.to_s.include?(":")}]
   
   
   #puts "Sending Command: #{cmd}"
@@ -359,6 +340,7 @@ end
 
 def TopMenu(pNm,mId,params)
   #puts "#{__method__}: #{mId}\n#{params}"
+  return [{:id => 'heos_ip',:cmd => 'heos_ip',:text => 'Could not Locate Player',:icon => 'plugins/heos/icons/heos+account'}] unless @@sock
   return [{:id => 'heos_account',:cmd => 'heos_account',:text => 'Heos Account',:icon => 'plugins/heos/icons/heos+account'}] if @@userDB[:current].to_s == ""
   r = SendToPlayer("browse/get_music_sources")
   #puts r
@@ -476,7 +458,7 @@ def Status(pNm,mId,params)
       :Id => id,
       :Time => time,
       :Duration => duration,
-      :Info => i.reject { |item| item.nil? || item == '' },
+      :Info => i.reject { |item| item.to_s == '' },
       :Artwork => art,
       :Volume => vol,
       :Mute => mute,
@@ -500,7 +482,13 @@ puts "#{__method__} Debug: MID - #{mId} : Params - #{params}"
      b = [{:id=>"browse/play_stream?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}",:cmd=>"cmd:queue",:text=>"Play Now"}]
   when "heos_login"
      b = [{:id=>mId,:cmd=>"cmd:remove_account",:text=>"Remove Account"}]
-  else #"container", "album", "artist", "genre", "song", "playlist"
+  when "playlist"
+    b = [{:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=1",:cmd=>"cmd:queue",:text=>"Play Now"},
+         {:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=2",:cmd=>"cmd:queue",:text=>"Play Next"},
+         {:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=3",:cmd=>"cmd:queue",:text=>"Add To Queue"},
+         {:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=4",:cmd=>"cmd:queue",:text=>"Replace Queue"},
+         {:id=>"browse/delete_playlist?#{mId}",:cmd=>"cmd:queue",:text=>"Delete Playlist"}]
+  else #"container", "album", "artist", "genre", "song"
     b = [{:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=1",:cmd=>"cmd:queue",:text=>"Play Now"},
          {:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=2",:cmd=>"cmd:queue",:text=>"Play Next"},
          {:id=>"browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=3",:cmd=>"cmd:queue",:text=>"Add To Queue"},
@@ -511,59 +499,97 @@ puts "#{__method__} Debug: MID - #{mId} : Params - #{params}"
 end
 
 def NowPlaying(pNm,mId,params)
-#puts "#{__method__} Not Implemented: MID - #{mId} : Params - #{params}"
-  #"player/get_queue?pid=1&range=0,10"
+  #puts "#{__method__}: MID - #{mId} : Params - #{params}"
   
-  #r = SendToPlayer("player/get_now_playing_media?pid=#{@@playerDB[pNm][:HeosId]}")
-  
+  r = SendToPlayer("player/get_now_playing_media?pid=#{@@playerDB[pNm][:HeosId]}")
+  puts r
   b = []
-  r = SendToPlayer("player/get_queue?pid=#{@@playerDB[pNm][:HeosId]}")
-  #puts r
-  if r
-    h = {}
-    h[:id] = "save"
-    h[:cmd] = "queue_save"
-    h[:text] = "Save Playlist"
-    h[:iInput] = true
-
-    b << h
-    r["payload"].each do |s|
-      #if s["sid"]
-      #  id = "sid=#{s["sid"]}"
-      #elsif s["mid"]
-      #  id = "#{mId.split("&cid=")[0]}&mid=#{s["mid"]}"
-      #else
-      #  id = "#{mId.split("&cid=")[0]}&cid=#{s["cid"]}"
-      #end
-      #puts s
-      #img = s["image_url"] || s["image_uri"]
-      #if s["image_url"] == "" && j
-      #  img = j[s["name"]] || img
-      #end
+  if r && r["payload"]["type"] == "station"
+    o =  r["options"].to_s
+    if o.include?("Add to HEOS Favorites")
       h = {}
-      h[:id] = s["qid"]
-      h[:cmd] = "queue_jump"
-      h[:text] = "#{s["qid"]}. #{s["song"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})}\n"\
-                 "#{s["artist"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})} - "\
-                 "#{s["album"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})}"
-      #h[:icon] = img if img.length > 0
-      h[:iContext] = true
+      h[:id] = "player/get_now_playing_media?pid=#{@@playerDB[pNm][:HeosId]}&id=19"
+      h[:cmd] = "station_favorite"
+      s = r["payload"]["station"]
+      s = "Current Station" if s == ""
+      h[:text] = "Add #{s} to Favorites"
+      h[:icon] = r["payload"]["image_url"]
       b << h
     end
+    if o.include?("Thumbs Up")
+      h = {}
+      h[:id] = "browse/set_service_option?pid=#{@@playerDB[pNm][:HeosId]}&sid=#{r["payload"]["sid"]}&option=11"
+      h[:cmd] = "service_option"
+      h[:text] = "Thumbs Up: #{r["payload"]["station"]}"
+      h[:icon] = "plugins/heos/icons/thumbs+up"
+      b << h
+    end
+    if o.include?("Thumbs Down")
+      h = {}
+      h[:id] = "browse/set_service_option?pid=#{@@playerDB[pNm][:HeosId]}&sid=#{r["payload"]["sid"]}&option=12"
+      h[:cmd] = "service_option"
+      h[:text] = "Thumbs Down: #{r["payload"]["station"]}"
+      h[:icon] = "plugins/heos/icons/thumbs+down"
+      b << h
+    end
+  else
+    q = r["payload"]["qid"] || 1
+    
+    r = SendToPlayer("player/get_queue?pid=#{@@playerDB[pNm][:HeosId]}")
+    #puts r
+    if r
+      h = {}
+      h[:id] = "queue_save"
+      h[:cmd] = "queue_save"
+      h[:text] = "Save Playlist"
+      h[:iInput] = true
+  
+      b << h
+      #puts r
+      r["payload"].each do |s|
+        img = s["image_url"] || s["image_uri"]
+        if s["image_url"] == "" && j
+          img = j[s["name"]] || img
+        end
+        if img.include?("opml.radiotime.com")
+          img = ""
+        end
+        h = {}
+        h[:id] = s["qid"]
+        h[:cmd] = "queue_jump"
+        h[:text] = "#{s["qid"]}. #{s["song"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})}\n"\
+                   "#{s["artist"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})} - "\
+                   "#{s["album"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})}"
+        h[:icon] = img if img.length > 0
+        h[:iContext] = true
+        h[:current] = true if s["qid"] == q
+        b << h
+      end
+    end
   end
-  #puts "Now Playing Menu:"
-  #puts b
+
   return b
-  rescue
-     puts $!, $@
 end
 
+
 def AutoStart(pNm,mId,params)
-puts "#{__method__} Not Implemented: MID - #{mId} : Params - #{params}"
+  puts "#{__method__} Not Implemented: MID - #{mId} : Params - #{params}"
+  
+  return {}
+end
+
+def PlaylistJump(pNm,mId,params)
+  puts "#{__method__} Partially Implemented: MID - #{mId} : Params - #{params}"
+  if mId.include?("set_service_option")
+    ParseMenu(mId)
+  else
+    queue_jump(pNm,mId,params)
+  end
+  return {}
 end
 
 def SkipToTime(pNm,mId,params)
-puts "#{__method__} Not Implemented: MID - #{mId} : Params - #{params}"
+  puts "#{__method__} Not Implemented: MID - #{mId} : Params - #{params}"
 end
 
 def TransportPlay(pNm,mId,params)
@@ -599,7 +625,7 @@ def TransportSkipForward(pNm,mId,params)
   return {}
 end
 
-def TransportShuffleToggle(pNm,mId,params)
+def TransportShuffleToggle(pNm,mId,params) #Thumbs Down
   @@playerDB[pNm][:Shuffle] = (@@playerDB[pNm][:Shuffle] || 0) + 1
   case @@playerDB[pNm][:Shuffle]
   when 1
@@ -612,7 +638,7 @@ def TransportShuffleToggle(pNm,mId,params)
   return {}
 end
 
-def TransportRepeatToggle(pNm,mId,params)
+def TransportRepeatToggle(pNm,mId,params) #Thumbs Up
   @@playerDB[pNm][:Repeat] = (@@playerDB[pNm][:Repeat] || 0) + 1
   case @@playerDB[pNm][:Repeat]
   when 1
@@ -739,48 +765,6 @@ def search_service(pNm,mId,params)
   return ParseMenu("#{mId}&search=#{params["search"]}",mId)
 end
 
-def OLDsearch_service(pNm,mId,params)
-  #puts "#{__method__}: #{mId}\n#{params}"
-  #
-  ##puts r
-  b = []
-  
-    r["payload"].each do |s|
-      s["name"] = URI.decode(s["name"])
-      
-      if s["sid"]
-        id = "sid=#{s["sid"]}"
-      elsif s["mid"]
-        id = "#{mId.split("&cid=")[0]}&mid=#{s["mid"]}"
-      else
-        id = "#{mId.split("&cid=")[0]}&cid=#{s["cid"]}"
-      end
-      id = "#{mId.match(/.+?\?([^\&]+)&.+/).captures[0]}&cid=#{s["cid"]}"
-      
-      #puts s
-      img = s["image_url"] || s["image_uri"]
-      if s["image_url"] == "" && j
-        img = j[s["name"]] || img
-      end
-      if img.include?("opml.radiotime.com")
-        img = ""
-      end
-      #puts img
-      
-      h = {}
-      h[:id] = Base64.strict_encode64(id)
-      h[:cmd] = s["type"]
-      h[:text] = s["name"].encode("ASCII", {:invalid => :replace, :undef => :replace, :replace => ''})
-      h[:icon] = img if img.length > 0
-      h[:iContext] = true if s["playable"] == "yes"
-      h[:args] = s
-      b << h
-      
-    end
-    
-  return b
-end
-
 def heos_server(pNm,mId,params)
   return StandardBrowse(mId)
 end
@@ -834,6 +818,12 @@ def song(pNm,mId,params)
   return {}
 end
 
+def playlist(pNm,mId,params)
+  SendToPlayer("browse/add_to_queue?pid=#{@@playerDB[pNm][:HeosId]}&#{mId}&aid=1")
+  return {}
+end
+
+
 def queue(pNm,mId,params)
   #puts "#{__method__}: #{mId}\n#{params}"
   SendToPlayer(mId)
@@ -849,6 +839,28 @@ end
 def queue_save(pNm,mId,params)
   SendToPlayer("player/save_queue?pid=#{@@playerDB[pNm][:HeosId]}&name=#{params["search"]}")
   return {}
+end
+
+def heos_ip(pNm,mId,params)
+  return [{:id=>"heos_connect",:cmd=>"heos_connect",:text=>"Player Address",:iInput=>true}]
+end
+
+def heos_connect(pNm,mId,params)
+  puts "Attempting to connect to player at: #{params["search"]}"
+  begin
+    status = Timeout::timeout(1) {
+      @@heosServerAddress = params["search"]
+      @@sock = TCPSocket.open(@@heosServerAddress,1255)
+    }
+  rescue Timeout::Error
+    puts "Heos Not Found"
+    @@heosServerAddress = ""
+    @@sock = false
+    return nil
+  end
+  @@userDB[:server] = @@heosServerAddress
+  SaveToFile("/acc",@@userDB)
+  return [{:id=>"success",:cmd=>"success",:text=>"Connected!\nPlease return to top menu"}]
 end
 
 def heos_account(pNm,mId,params)
@@ -911,7 +923,12 @@ def get_pass(pNm,mId,params)
 end
 
 def manage_playing(pNm,mId,params)
+  return NowPlaying(pNm,mId,params)
+end
+
+def OLDmanage_playing(pNm,mId,params)
   #"player/get_queue?pid=1&range=0,10"
+  puts "#{__method__}: MID - #{mId} : Params - #{params}"
   
   r = SendToPlayer("player/get_now_playing_media?pid=#{@@playerDB[pNm][:HeosId]}")
   puts r
@@ -922,7 +939,9 @@ def manage_playing(pNm,mId,params)
       h = {}
       h[:id] = "player/get_now_playing_media?pid=#{@@playerDB[pNm][:HeosId]}&id=19"
       h[:cmd] = "station_favorite"
-      h[:text] = "Add #{r["payload"]["station"]} to Favorites"
+      s = r["payload"]["station"]
+      s = "Current Station" if s == ""
+      h[:text] = "Add #{s} to Favorites"
       h[:icon] = r["payload"]["image_url"]
       b << h
     end
