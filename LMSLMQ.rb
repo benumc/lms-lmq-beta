@@ -11,7 +11,7 @@ require 'json'
 require 'tempfile'
 require 'base64'
 
-$SqueezeboxServerIP = "192.168.1.40"
+$SqueezeboxServerIP = nil
 $SqueezeboxServerPort = 9000
 
 $Head = "HTTP/1.1 200 OK\r\nServer: Logitech Media Server\r\nContent-Length: 0\r\nContent-Type: application/json"
