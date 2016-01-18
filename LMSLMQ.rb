@@ -451,6 +451,8 @@ def ServerPost(h,msg)
     #puts "Squeeze Response:\n#{r}\n\n" if p
       
     return "#{h}#{r}"
+  rescue
+    $SqueezeboxServerIP = nil
 end
 
 def SavantRequest(req,head,msg)
@@ -472,13 +474,15 @@ def SavantRequest(req,head,msg)
   elsif $uidHash[hstnm]
     hostname = $uidHash[hstnm]
     pNm = (hostname["plugin"]||"").capitalize
-  else
+  elsif $SqueezeboxServerIP
     #puts "Possibly need to forward to squeezebox server"
     #puts req
     msg.gsub!("999999999999999","1000") if head.include? "POST"
     msg.gsub!("\"time\": \"\([^ ]*\)\",","\"time\": \1,")
-    r = ServerPost(head,msg)
+    r = ServerPost(head,msg) 
     return r
+  else
+    return EmptyBody()
   end
   #end
   #puts "Hostname: #{hostname}"
