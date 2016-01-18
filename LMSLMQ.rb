@@ -452,7 +452,8 @@ def ServerPost(h,msg)
       
     return "#{h}#{r}"
   rescue
-    $SqueezeboxServerIP = nil
+    puts $!, $@
+    return nil
 end
 
 def SavantRequest(req,head,msg)
@@ -480,7 +481,7 @@ def SavantRequest(req,head,msg)
     msg.gsub!("999999999999999","1000") if head.include? "POST"
     msg.gsub!("\"time\": \"\([^ ]*\)\",","\"time\": \1,")
     r = ServerPost(head,msg) 
-    return r
+    return r || EmptyBody()
   else
     return EmptyBody()
   end
